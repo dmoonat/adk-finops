@@ -262,7 +262,7 @@ CostTracker.register_tool_rate("internal_vector_db", 0.0005)
 Gemini 2.5 Pro and Flash separate reasoning/thinking tokens into `thoughtsTokenCount`. 
 
 Per Google Cloud pricing rules:
-$$\text{Total Billable Output Tokens} = \text{candidates\_token\_count} + \text{thoughts\_token\_count}$$
+> **Total Billable Output Tokens** = `candidates_token_count` + `thoughts_token_count`
 
 `adk-finops` automatically incorporates thinking tokens into the output token rate while reporting them as a separate field in `breakdown_by_model` so you can monitor your reasoning overhead.
 
