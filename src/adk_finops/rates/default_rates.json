@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2026.03",
+  "description": "Standard LLM pricing rate cards (USD per 1,000,000 tokens unless specified).",
+  "models": {
+    "gemini-2.5-flash": {
+      "provider": "google",
+      "input_per_1m": 0.30,
+      "output_per_1m": 2.50,
+      "cached_input_per_1m": 0.03,
+      "input_per_1m_gt_128k": 0.30,
+      "output_per_1m_gt_128k": 2.50,
+      "cached_input_per_1m_gt_128k": 0.03
+    },
+    "gemini-2.5-pro": {
+      "provider": "google",
+      "input_per_1m": 1.25,
+      "output_per_1m": 5.00,
+      "cached_input_per_1m": 0.3125,
+      "input_per_1m_gt_128k": 2.50,
+      "output_per_1m_gt_128k": 10.00,
+      "cached_input_per_1m_gt_128k": 0.625
+    },
+    "gemini-2.0-flash": {
+      "provider": "google",
+      "input_per_1m": 0.10,
+      "output_per_1m": 0.40,
+      "cached_input_per_1m": 0.025
+    },
+    "gemini-1.5-flash": {
+      "provider": "google",
+      "input_per_1m": 0.075,
+      "output_per_1m": 0.30,
+      "cached_input_per_1m": 0.01875,
+      "input_per_1m_gt_128k": 0.15,
+      "output_per_1m_gt_128k": 0.60,
+      "cached_input_per_1m_gt_128k": 0.0375
+    },
+    "gemini-1.5-pro": {
+      "provider": "google",
+      "input_per_1m": 1.25,
+      "output_per_1m": 5.00,
+      "cached_input_per_1m": 0.3125,
+      "input_per_1m_gt_128k": 2.50,
+      "output_per_1m_gt_128k": 10.00,
+      "cached_input_per_1m_gt_128k": 0.625
+    },
+    "gemini-3.5-flash": {
+      "provider": "google",
+      "input_per_1m": 1.50,
+      "output_per_1m": 9.00,
+      "cached_input_per_1m": 0.15
+    },
+    "gemini-3.7-flash": {
+      "provider": "google",
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "cached_input_per_1m": 0.075
+    },
+    "gpt-4o": {
+      "provider": "openai",
+      "input_per_1m": 2.50,
+      "output_per_1m": 10.00,
+      "cached_input_per_1m": 1.25
+    },
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.60,
+      "cached_input_per_1m": 0.075
+    },
+    "o1": {
+      "provider": "openai",
+      "input_per_1m": 15.00,
+      "output_per_1m": 60.00,
+      "cached_input_per_1m": 7.50
+    },
+    "o1-mini": {
+      "provider": "openai",
+      "input_per_1m": 1.10,
+      "output_per_1m": 4.40,
+      "cached_input_per_1m": 0.55
+    },
+    "o3-mini": {
+      "provider": "openai",
+      "input_per_1m": 1.10,
+      "output_per_1m": 4.40,
+      "cached_input_per_1m": 0.55
+    },
+    "claude-3-7-sonnet": {
+      "provider": "anthropic",
+      "input_per_1m": 3.00,
+      "output_per_1m": 15.00,
+      "cached_input_per_1m": 0.30
+    },
+    "claude-3-5-sonnet": {
+      "provider": "anthropic",
+      "input_per_1m": 3.00,
+      "output_per_1m": 15.00,
+      "cached_input_per_1m": 0.30
+    },
+    "claude-3-5-haiku": {
+      "provider": "anthropic",
+      "input_per_1m": 0.80,
+      "output_per_1m": 4.00,
+      "cached_input_per_1m": 0.08
+    },
+    "claude-3-opus": {
+      "provider": "anthropic",
+      "input_per_1m": 15.00,
+      "output_per_1m": 75.00,
+      "cached_input_per_1m": 1.50
+    },
+    "deepseek-v3": {
+      "provider": "deepseek",
+      "input_per_1m": 0.14,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.014
+    },
+    "deepseek-r1": {
+      "provider": "deepseek",
+      "input_per_1m": 0.55,
+      "output_per_1m": 2.19,
+      "cached_input_per_1m": 0.14
+    }
+  },
+  "tools": {
+    "vertex_grounding_google_search": 0.035,
+    "vertex_grounding_private": 0.0025
+  },
+  "fallback": {
+    "provider": "unknown",
+    "input_per_1m": 0.30,
+    "output_per_1m": 2.50,
+    "cached_input_per_1m": 0.03
+  }
+}

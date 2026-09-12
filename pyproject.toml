@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adk-finops"
+version = "0.1.0"
+description = "Universal LLM FinOps cost and token tracking plugin for Google Agent Development Kit (ADK) and Python agent frameworks."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "Google LLC" }
+]
+keywords = [
+    "adk",
+    "google-adk",
+    "finops",
+    "llm-cost-tracking",
+    "gemini",
+    "token-usage",
+    "vertex-ai",
+    "ai-agents"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []
+
+[project.optional-dependencies]
+adk = [
+    "google-adk>=0.1.0"
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.20.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/google/adk-finops"
+Repository = "https://github.com/google/adk-finops"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/adk_finops"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
