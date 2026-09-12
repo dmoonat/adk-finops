@@ -70,6 +70,16 @@ pip install adk-finops
 pip install "adk-finops[adk]"
 ```
 
+### From GitHub (Direct Git Dependency)
+```bash
+pip install git+https://github.com/dmoonat/adk-finops.git
+```
+
+Or in `requirements.txt`:
+```text
+adk-finops @ git+https://github.com/dmoonat/adk-finops.git@main
+```
+
 ---
 
 ## Quickstart with Google ADK
