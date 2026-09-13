@@ -20,6 +20,7 @@
 - [Context Caching Savings Analytics (ROI Tracker)](#context-caching-savings-analytics-roi-tracker)
 - [Multi-Agent Cost Attribution & Delegation Tracking](#multi-agent-cost-attribution--delegation-tracking)
 - [Rich Terminal Summary Box](#rich-terminal-summary-box)
+  - [Automatic & On-Demand Integration](#automatic--on-demand-integration)
 - [Decoupled Rate Cards (Custom & Enterprise Pricing)](#decoupled-rate-cards-custom--enterprise-pricing)
   - [1. Custom JSON Rate Card](#1-custom-json-rate-card)
   - [2. Environment Variable](#2-environment-variable)
@@ -336,18 +337,60 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
 
 ### Features
 
-- **Automatic Rendering**: Enabled by default in `FinOpsCostPlugin(render_terminal_box=True)`.
-- **Rich or Pure-Python Unicode Fallback**: If the [`rich`](https://github.com/Textualize/rich) package is installed (`pip install "adk-finops[rich]"`), it renders full 24-bit color styling and rounded boxes. If `rich` is not installed, it falls back seamlessly to a pure-Python Unicode box drawing with zero dependencies.
-- **On-Demand Printing**:
-  ```python
-  from adk_finops import print_summary, format_summary_box, CostTracker
+- **Rich 24-Bit Color Styling**: When [`rich`](https://github.com/Textualize/rich) is installed (`pip install "adk-finops[rich]"`), it renders full color highlights, styled headers, and rounded boxes.
+- **Pure-Python Unicode Fallback**: If `rich` is not installed, it falls back seamlessly to an aligned pure-Python Unicode box drawing (`╭─╮│╰─╯`) with zero external dependencies.
+- **Responsive 80-Column Layout**: Designed to fit standard terminal windows without clipping or wrapping.
 
-  # Print directly to terminal:
-  print_summary()
+### Automatic & On-Demand Integration
 
-  # Or retrieve formatted string for custom loggers or Slack/Discord webhooks:
-  box_str = format_summary_box(CostTracker.get_summary())
-  ```
+`adk-finops` supports both hands-off automated terminal reporting in Google ADK and explicit on-demand rendering for any Python workflow:
+
+#### 1. Automatic Integration (Google ADK)
+
+When using `FinOpsCostPlugin`, the summary box is rendered automatically to stdout at the conclusion of every turn (`after_run_callback`):
+
+```python
+from google.adk.agents import Agent
+from google.adk.apps import App
+from adk_finops import FinOpsCostPlugin
+
+# Automatically renders the Rich box at the end of each turn
+finops_plugin = FinOpsCostPlugin(
+    default_model="gemini-2.5-pro",
+    render_terminal_box=True,  # Enabled by default
+)
+
+app = App(
+    name="support_agent",
+    root_agent=Agent(name="support_agent", model="gemini-2.5-pro"),
+    plugins=[finops_plugin],
+)
+```
+
+> [!TIP]
+> To disable the box and retain only standard single-line log output (e.g. in headless CI/CD environments), pass `render_terminal_box=False`.
+
+#### 2. On-Demand Integration (Standalone & Custom Workflows)
+
+You can trigger terminal rendering programmatically at any time across your batch scripts, agent loops, or background tasks:
+
+```python
+from adk_finops import CostTracker, format_summary_box, print_summary
+
+# 1. Print current turn/session summary box directly to terminal stdout
+print_summary()
+
+# Or specify an explicit turn and session ID:
+print_summary(run_id="turn_123", session_id="session_abc")
+
+# 2. Or call directly from CostTracker
+CostTracker.print_summary()
+
+# 3. Export formatted box string (ANSI or plain text) for custom loggers or webhooks (Slack/Discord)
+summary_data = CostTracker.get_summary()
+box_text = format_summary_box(summary_data)
+logger.info("\n" + box_text)
+```
 
 ---
 
