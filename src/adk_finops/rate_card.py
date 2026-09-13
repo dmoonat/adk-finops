@@ -32,6 +32,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ._version import __version__
 from .rates import DEFAULT_RATES_FILE
 
 logger = logging.getLogger("adk_finops.rate_card")
@@ -155,7 +156,7 @@ class RateCardRegistry:
         """Fetches and loads rate cards from a remote HTTP/HTTPS URL."""
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "adk-finops/0.1.0"},
+            headers={"User-Agent": f"adk-finops/{__version__}"},
         )
         with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
             content = response.read().decode("utf-8")

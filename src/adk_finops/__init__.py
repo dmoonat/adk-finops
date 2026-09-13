@@ -41,4 +41,4 @@ except ImportError:
         "format_summary_box",
     ]
 
-__version__ = "0.1.1"
+from ._version import __version__
