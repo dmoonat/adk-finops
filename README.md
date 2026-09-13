@@ -1,7 +1,6 @@
 # adk-finops
 
 [![PyPI](https://img.shields.io/pypi/v/adk-finops.svg)](https://pypi.org/project/adk-finops/)
-[![Downloads](https://img.shields.io/pypi/dm/adk-finops.svg)](https://pypi.org/project/adk-finops/)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Typing: Typed](https://img.shields.io/badge/typing-typed-green.svg)](src/adk_finops/py.typed)
