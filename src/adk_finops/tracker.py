@@ -688,6 +688,34 @@ class CostTracker:
         return result
 
     @classmethod
+    def print_summary(
+        cls,
+        run_id: str | None = None,
+        session_id: str | None = None,
+        pop: bool = False,
+    ) -> None:
+        """Prints a beautiful Rich or Unicode summary box to stdout."""
+        from .display import print_summary as _print_summary
+
+        summary = cls.get_summary(run_id=run_id, session_id=session_id, pop=pop)
+        _print_summary(summary)
+
+    @classmethod
+    def format_summary_box(
+        cls,
+        run_id: str | None = None,
+        session_id: str | None = None,
+        pop: bool = False,
+    ) -> str:
+        """Formats the summary as a string box (Rich ANSI or Unicode plain text)."""
+        from .display import format_summary_box as _format_summary_box
+
+        summary = cls.get_summary(run_id=run_id, session_id=session_id, pop=pop)
+        if not summary:
+            return ""
+        return _format_summary_box(summary)
+
+    @classmethod
     @contextlib.contextmanager
     def track_run(cls, run_id: str) -> Generator[dict[str, Any], None, None]:
         """Convenience context manager for wrapping a code block or request."""

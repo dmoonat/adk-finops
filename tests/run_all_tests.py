@@ -26,6 +26,7 @@ import test_plugin
 import test_budget
 import test_savings
 import test_multi_agent
+import test_display
 
 modules = [
     test_rate_card,
@@ -34,6 +35,7 @@ modules = [
     test_budget,
     test_savings,
     test_multi_agent,
+    test_display,
 ]
 
 async def run_all():

@@ -59,6 +59,7 @@ class FinOpsCostPlugin(BasePlugin):
         agent_budgets: dict[str, float] | None = None,
         on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
         fallback_model: str = "gemini-2.5-flash",
+        render_terminal_box: bool = True,
     ):
         super().__init__(name=name)
         self.default_model = default_model
@@ -67,6 +68,7 @@ class FinOpsCostPlugin(BasePlugin):
         self.agent_budgets = agent_budgets
         self.on_budget_exceeded = on_budget_exceeded.lower()
         self.fallback_model = fallback_model
+        self.render_terminal_box = render_terminal_box
 
         # Configure budgets in CostTracker if specified
         if budget_limit_usd is not None or turn_budget_limit_usd is not None or agent_budgets is not None:
@@ -337,3 +339,8 @@ class FinOpsCostPlugin(BasePlugin):
                 agents_msg = f"[FinOps Agents] " + " | ".join(agent_parts)
                 print(agents_msg, flush=True)
                 logger.info(agents_msg)
+
+            if self.render_terminal_box:
+                from .display import print_summary
+
+                print_summary(summary)

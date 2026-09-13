@@ -19,6 +19,7 @@
 - [Budget Guards & Circuit Breakers](#budget-guards--circuit-breakers)
 - [Context Caching Savings Analytics (ROI Tracker)](#context-caching-savings-analytics-roi-tracker)
 - [Multi-Agent Cost Attribution & Delegation Tracking](#multi-agent-cost-attribution--delegation-tracking)
+- [Rich Terminal Summary Box](#rich-terminal-summary-box)
 - [Decoupled Rate Cards (Custom & Enterprise Pricing)](#decoupled-rate-cards-custom--enterprise-pricing)
   - [1. Custom JSON Rate Card](#1-custom-json-rate-card)
   - [2. Environment Variable](#2-environment-variable)
@@ -305,6 +306,53 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
 
 ---
 
+## Rich Terminal Summary Box
+
+`adk-finops` includes an out-of-the-box, color-coded, border-styled terminal summary box. When running in a terminal, it provides instant financial visibility after every turn, displaying turn vs. session costs, context caching ROI, model breakdowns, and sub-agent attributions:
+
+```text
+╭───────────────────────── 💸 ADK FinOps Cost Summary ─────────────────────────╮
+│                                                                              │
+│  Scope           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
+│  ──────────────────────────────────────────────────────────────────          │
+│  Current Turn        3   28,400    $0.0289     $0.0280      $0.0569          │
+│  Session Total       3   28,400    $0.0289     $0.0280      $0.0569          │
+│                                                                              │
+│  💰 Context Caching Savings: $0.0016 saved (2.8% reduction from $0.0585 gross)│
+│                                                                              │
+│  Model              Calls   Tokens (In / Out)   Cost (USD)    Cache Savings  │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│  gemini-2.5-pro         1         1,200 / 300      $0.0030                —  │
+│  gemini-2.5-flash       1         8,000 / 600      $0.0023   $0.0016 (41.5%) │
+│  codemender             1      15,000 / 3,300      $0.0236                —  │
+│                                                                              │
+│  Agent           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
+│  ──────────────────────────────────────────────────────────────────          │
+│  🤖 supervisor       1    1,500    $0.0030       $0.00      $0.0030          │
+│  🤖 researcher       1    8,600    $0.0023     $0.0280      $0.0303          │
+│  🤖 coder            1   18,300    $0.0236       $0.00      $0.0236          │
+│                                                                              │
+│  🛡️  Budget Guard: $0.0569 / $1.0000 (5.7% utilized)                         │
+╰───────────────── adk-finops • Universal Token & Cost Engine ─────────────────╯
+```
+
+### Features
+
+- **Automatic Rendering**: Enabled by default in `FinOpsCostPlugin(render_terminal_box=True)`.
+- **Rich or Pure-Python Unicode Fallback**: If the [`rich`](https://github.com/Textualize/rich) package is installed (`pip install "adk-finops[rich]"`), it renders full 24-bit color styling and rounded boxes. If `rich` is not installed, it falls back seamlessly to a pure-Python Unicode box drawing with zero dependencies.
+- **On-Demand Printing**:
+  ```python
+  from adk_finops import print_summary, format_summary_box, CostTracker
+
+  # Print directly to terminal:
+  print_summary()
+
+  # Or retrieve formatted string for custom loggers or Slack/Discord webhooks:
+  box_str = format_summary_box(CostTracker.get_summary())
+  ```
+
+---
+
 ## Decoupled Rate Cards (Custom & Enterprise Pricing)
 
 Pricing is completely decoupled from the tracking engine. You can configure rates via:
@@ -462,6 +510,7 @@ FinOpsCostPlugin(
 | `agent_budgets` | `dict[str, float]` | `None` | Per-agent spending caps in USD (e.g. `{"researcher": 0.50, "coder": 1.00}`). |
 | `on_budget_exceeded` | `str` | `"halt"` | Action on budget breach: `"halt"` (raise/block), `"warn"`, or `"downgrade"`. |
 | `fallback_model` | `str` | `"gemini-2.5-flash"` | Target model when using `"downgrade"` mode. |
+| `render_terminal_box` | `bool` | `True` | Renders a beautiful color-coded summary box to stdout at the end of each turn. |
 
 ---
 
