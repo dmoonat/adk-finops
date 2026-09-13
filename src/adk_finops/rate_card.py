@@ -51,12 +51,19 @@ class ModelRate:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ModelRate:
-        """Creates a ModelRate from a raw dictionary."""
+        """Creates a ModelRate from a raw dictionary, respecting transition dates."""
+        from datetime import date
+
+        effective_data = dict(data)
+        # Automatically apply standard pricing starting January 1, 2027
+        if "standard_pricing_2027" in data and date.today() >= date(2027, 1, 1):
+            effective_data.update(data["standard_pricing_2027"])
+
         return cls(
-            provider=data.get("provider", "unknown"),
-            input_per_1m=float(data.get("input_per_1m", 0.30)),
-            output_per_1m=float(data.get("output_per_1m", 2.50)),
-            cached_input_per_1m=float(data.get("cached_input_per_1m", 0.03)),
+            provider=effective_data.get("provider", "unknown"),
+            input_per_1m=float(effective_data.get("input_per_1m", 0.30)),
+            output_per_1m=float(effective_data.get("output_per_1m", 2.50)),
+            cached_input_per_1m=float(effective_data.get("cached_input_per_1m", 0.03)),
             input_per_1m_gt_128k=(
                 float(data["input_per_1m_gt_128k"])
                 if "input_per_1m_gt_128k" in data and data["input_per_1m_gt_128k"] is not None

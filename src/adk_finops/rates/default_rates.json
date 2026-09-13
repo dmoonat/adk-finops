@@ -21,41 +21,55 @@
       "output_per_1m_gt_128k": 10.00,
       "cached_input_per_1m_gt_128k": 0.625
     },
-    "gemini-2.0-flash": {
-      "provider": "google",
-      "input_per_1m": 0.10,
-      "output_per_1m": 0.40,
-      "cached_input_per_1m": 0.025
-    },
-    "gemini-1.5-flash": {
-      "provider": "google",
-      "input_per_1m": 0.075,
-      "output_per_1m": 0.30,
-      "cached_input_per_1m": 0.01875,
-      "input_per_1m_gt_128k": 0.15,
-      "output_per_1m_gt_128k": 0.60,
-      "cached_input_per_1m_gt_128k": 0.0375
-    },
-    "gemini-1.5-pro": {
-      "provider": "google",
-      "input_per_1m": 1.25,
-      "output_per_1m": 5.00,
-      "cached_input_per_1m": 0.3125,
-      "input_per_1m_gt_128k": 2.50,
-      "output_per_1m_gt_128k": 10.00,
-      "cached_input_per_1m_gt_128k": 0.625
-    },
     "gemini-3.5-flash": {
       "provider": "google",
       "input_per_1m": 1.50,
       "output_per_1m": 9.00,
       "cached_input_per_1m": 0.15
     },
+    "gemini-3.8-flash": {
+      "provider": "google",
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "cached_input_per_1m": 0.075,
+      "standard_pricing_2027": {
+        "input_per_1m": 1.50,
+        "output_per_1m": 7.50,
+        "cached_input_per_1m": 0.15
+      }
+    },
     "gemini-3.7-flash": {
       "provider": "google",
       "input_per_1m": 0.75,
       "output_per_1m": 3.75,
-      "cached_input_per_1m": 0.075
+      "cached_input_per_1m": 0.075,
+      "standard_pricing_2027": {
+        "input_per_1m": 1.50,
+        "output_per_1m": 7.50,
+        "cached_input_per_1m": 0.15
+      }
+    },
+    "gemini-3.6-flash": {
+      "provider": "google",
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "cached_input_per_1m": 0.075,
+      "standard_pricing_2027": {
+        "input_per_1m": 1.50,
+        "output_per_1m": 7.50,
+        "cached_input_per_1m": 0.15
+      }
+    },
+    "codemender": {
+      "provider": "google",
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "cached_input_per_1m": 0.075,
+      "standard_pricing_2027": {
+        "input_per_1m": 1.50,
+        "output_per_1m": 7.50,
+        "cached_input_per_1m": 0.15
+      }
     },
     "gpt-4o": {
       "provider": "openai",
@@ -125,7 +139,8 @@
     }
   },
   "tools": {
-    "vertex_grounding_google_search": 0.035,
+    "vertex_grounding_google_search": 0.014,
+    "vertex_grounding_maps": 0.014,
     "vertex_grounding_private": 0.0025
   },
   "fallback": {

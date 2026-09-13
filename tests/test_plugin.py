@@ -44,7 +44,7 @@ async def test_tool_fee_discrimination():
     assert s1["turn"]["total_tool_calls"] == 0
     assert s1["turn"]["tool_cost_usd"] == 0.0
 
-    # 2. Google Search Grounding tool should incur $0.035
+    # 2. Google Search Grounding tool should incur $0.014 ($14 / 1,000 queries)
     class GoogleSearchTool:
         name = "google_search"
         __module__ = "google.adk.tools.grounding"
@@ -58,4 +58,4 @@ async def test_tool_fee_discrimination():
 
     s2 = CostTracker.get_summary("test_turn_1", "test_sess_1", pop=False)
     assert s2["turn"]["total_tool_calls"] == 1
-    assert s2["turn"]["tool_cost_usd"] == 0.035
+    assert s2["turn"]["tool_cost_usd"] == 0.014

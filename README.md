@@ -52,7 +52,7 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
 - **Enterprise Volume Discounts**: Configure global or provider-specific discount multipliers (e.g., 15% Google Cloud negotiated discount).
 - **Accurate Thinking Tokens**: Automatically captures and bills `thoughts_token_count` at the output rate while displaying thinking tokens separately in reports.
-- **Smart Tool Discrimination**: Automatically excludes `MCPTool`, `McpToolset`, BigQuery, and local function tools (\$0.00 fee) while accurately billing Google Search Grounding (\$0.035) and Vertex AI Search (\$0.0025).
+- **Smart Tool Discrimination**: Automatically excludes `MCPTool`, `McpToolset`, BigQuery, and local function tools (\$0.00 fee) while accurately billing Google Search Grounding (\$0.014/query) and Vertex AI Search (\$0.0025/prompt).
 - **Real-Time UI Streaming**: Streams cost metrics to `event.actions.state_delta["finops_cost"]` for live updates in the ADK Web UI, with formatted terminal stdout logging.
 - **Zero Heavy Dependencies**: Pure Python standard library for the core tracker.
 
@@ -252,8 +252,9 @@ CostTracker.register_tool_rate("internal_vector_db", 0.0005)
 
 - **MCP Tools (`McpToolset`, `MCPTool`)**: Automatically identified and assigned **\$0.00** fee (e.g. `search_documents`).
 - **Database & Custom Tools**: BigQuery toolsets and custom Python functions incur **\$0.00** tool fee.
-- **Google Search Grounding**: Tools named `google_search` or `GoogleSearchTool` incur **\$0.035 / call** (\$35 per 1,000 queries).
-- **Vertex AI Search Grounding**: Tools matching `vertex_search`, `vertex_ai_search`, or `GroundingTool` incur **\$0.0025 / call** (\$2.50 per 1,000 queries).
+- **Google Search Grounding & Web Grounding**: Tools named `google_search` or `GoogleSearchTool` incur **\$0.014 / query** (\$14.00 per 1,000 queries; first 5,000 queries/month free). Charged for each individual Grounding Query performed by Gemini. Input tokens returned by search grounding are not charged.
+- **Google Maps Grounding**: Incurs **\$0.014 / query** (\$14.00 per 1,000 queries; first 5,000 queries/month free). Input tokens are not charged.
+- **Grounding with your data (Vertex AI Search / Datastores)**: Tools matching `vertex_search`, `vertex_ai_search`, or `GroundingTool` incur **\$0.0025 / prompt** (\$2.50 per 1,000 prompts).
 
 ---
 
@@ -322,11 +323,13 @@ The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) cont
 
 | Model | Provider | Input / 1M | Output / 1M | Cached / 1M | Context >128k Tier |
 | :--- | :---: | :---: | :---: | :---: | :---: |
+| `gemini-3.8-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
+| `gemini-3.7-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
+| `gemini-3.6-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
+| `codemender` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
+| `gemini-3.5-flash` | Google | \$1.50 | \$9.00 | \$0.15 | — |
 | `gemini-2.5-flash` | Google | \$0.30 | \$2.50 | \$0.03 | — |
 | `gemini-2.5-pro` | Google | \$1.25 | \$5.00 | \$0.3125 | In: \$2.50, Out: \$10.00 |
-| `gemini-2.0-flash` | Google | \$0.10 | \$0.40 | \$0.025 | — |
-| `gemini-1.5-flash` | Google | \$0.075 | \$0.30 | \$0.01875 | In: \$0.15, Out: \$0.60 |
-| `gemini-1.5-pro` | Google | \$1.25 | \$5.00 | \$0.3125 | In: \$2.50, Out: \$10.00 |
 | `gpt-4o` | OpenAI | \$2.50 | \$10.00 | \$1.25 | — |
 | `gpt-4o-mini` | OpenAI | \$0.15 | \$0.60 | \$0.075 | — |
 | `o1` | OpenAI | \$15.00 | \$60.00 | \$7.50 | — |
