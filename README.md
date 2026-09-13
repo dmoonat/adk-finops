@@ -33,6 +33,8 @@
 - [Standalone Usage (Without ADK)](#standalone-usage-without-adk)
 - [Configuration Reference](#configuration-reference)
 - [Built-In Model Rate Cards](#built-in-model-rate-cards)
+- [Coming Soon](#coming-soon)
+  - [One-Line BigQuery Exporter](#-one-line-bigquery-exporter)
 - [License](#license)
 
 ---
@@ -577,6 +579,27 @@ The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) cont
 | `claude-3-5-haiku` | Anthropic | \$0.80 | \$4.00 | \$0.08 | — |
 | `deepseek-v3` | DeepSeek | \$0.14 | \$0.28 | \$0.014 | — |
 | `deepseek-r1` | DeepSeek | \$0.55 | \$2.19 | \$0.14 | — |
+
+---
+
+## Coming Soon
+
+We are actively expanding `adk-finops` with enterprise-grade data warehouse integrations and analytics:
+
+### 📊 One-Line BigQuery Exporter
+
+Stream or batch-export turn, session, model, and sub-agent FinOps telemetry directly into a Google BigQuery dataset with a single configuration line:
+
+```python
+finops_plugin = FinOpsCostPlugin(
+    default_model="gemini-2.5-pro",
+    bigquery_table="my-gcp-project.finops.agent_costs",  # Coming soon!
+)
+```
+
+- **Zero-Boilerplate Schema Management**: Automatically provisions and manages partitioned and clustered BigQuery telemetry tables.
+- **Enterprise Reporting & Looker Dashboards**: Power real-time Looker Studio / Looker dashboards for department chargebacks, multi-tenant billing, and cost center attribution.
+- **Historical ROI & Trend Analytics**: Track cache hit rates, prompt growth, and grounding fee trends across millions of agent interactions over time.
 
 ---
 
