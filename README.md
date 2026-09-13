@@ -271,7 +271,7 @@ Per Google Cloud pricing rules:
 
 ## Standalone Usage (Without ADK)
 
-You can use `CostTracker` in any Python application, LangChain workflow, or FastAPI service:
+You can use `CostTracker` in any Python script, background worker, or web service:
 
 ```python
 from adk_finops import CostTracker
