@@ -110,12 +110,12 @@ def render_rich_summary(summary: dict[str, Any], console: Console | None = None)
     # --- 3. Model Breakdown Table ---
     models = sess_info.get("breakdown_by_model", {})
     if models:
-        model_table = Table(box=SIMPLE, show_header=True, header_style="bold magenta", pad_edge=False)
+        model_table = Table(box=SIMPLE, show_header=True, header_style="bold magenta", pad_edge=False, expand=False)
         model_table.add_column("Model", style="cyan", no_wrap=True)
         model_table.add_column("Calls", justify="right", no_wrap=True)
-        model_table.add_column("Tokens (In / Out)", justify="right", no_wrap=True)
+        model_table.add_column("Tokens (In/Out)", justify="right", no_wrap=True)
         model_table.add_column("Cost (USD)", justify="right", style="bold yellow", no_wrap=True)
-        model_table.add_column("Cache Savings", justify="right", style="green", no_wrap=True)
+        model_table.add_column("Savings", justify="right", style="green", no_wrap=True)
 
         for m_name, m_data in models.items():
             m_sav = m_data.get("savings_usd", 0.0)

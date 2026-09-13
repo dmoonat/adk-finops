@@ -323,10 +323,10 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
 │                                                                              │
 │  💰 Context Caching Savings: $0.0016 saved (4.6% reduction from $0.0349 gross)│
 │                                                                              │
-│  Model              Calls   Tokens (In / Out)   Cost (USD)    Cache Savings  │
-│  ──────────────────────────────────────────────────────────────────────────  │
-│  gemini-2.5-pro         1         1,200 / 300      $0.0030                —  │
-│  gemini-2.5-flash       1         8,000 / 600      $0.0023   $0.0016 (41.5%) │
+│  Model              Calls   Tokens (In/Out)   Cost (USD)           Savings   │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│  gemini-2.5-pro         1       1,200 / 300      $0.0030                 —   │
+│  gemini-2.5-flash       1       8,000 / 600      $0.0023   $0.0016 (41.5%)   │
 │                                                                              │
 │  Agent           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
 │  ──────────────────────────────────────────────────────────────────          │
