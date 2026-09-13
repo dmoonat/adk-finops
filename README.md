@@ -674,6 +674,49 @@ When `bigquery_table` is specified, `adk-finops` automatically inspects and prov
 
 ---
 
+### Understanding Streamed Rows & Dimensions (Rollup vs. Attributed Rows)
+
+When streaming telemetry to BigQuery, `adk-finops` records both **overall aggregates** (for high-level session/turn reporting) and **attributed breakdown rows** (for granular drill-downs by agent or model).
+
+#### Why are `agent_name` or `model_name` NULL in some rows?
+In data warehousing and BI rollup patterns, `NULL` is assigned to dimension columns in summary/rollup rows to distinguish between overall totals and specific entity breakdowns:
+
+- **Overall Aggregate Rows (`agent_name IS NULL`)**:
+  - Emitted once per turn or session representing the **cumulative total** across all agents and models.
+  - `agent_name` is `NULL` (can be displayed as `'OVERALL'` or `'TOTAL'` via `COALESCE(agent_name, 'OVERALL')`).
+  - If multiple models were used in the run, `model_name` is `NULL` (the complete distribution is preserved in the `breakdown_by_model` JSON column). If only a single model was used, `model_name` is set to that model.
+- **Attributed Agent Rows (`agent_name IS NOT NULL`)**:
+  - Emitted for each sub-agent participating in the turn/session (`agent_name = 'research_agent'`, etc.).
+  - `model_name` contains the primary model invoked by that agent (e.g. `gemini-2.5-pro`, `gemini-2.5-flash`).
+
+#### Querying Best Practices (Avoiding Double-Counting)
+Because both aggregate rows and attributed breakdown rows coexist in the same table, write your SQL queries according to the level of granularity you need:
+
+- **To query overall totals (e.g. total spend per session):**
+  ```sql
+  SELECT session_id, total_cost_usd, total_tokens
+  FROM `my-gcp-project.finops.agent_costs`
+  WHERE scope = 'session' AND agent_name IS NULL;
+  ```
+
+- **To query per-agent breakdown (without double-counting with the aggregate):**
+  ```sql
+  SELECT agent_name, SUM(total_cost_usd) AS agent_spend
+  FROM `my-gcp-project.finops.agent_costs`
+  WHERE scope = 'session' AND agent_name IS NOT NULL
+  GROUP BY 1;
+  ```
+
+- **To query by model:**
+  ```sql
+  SELECT model_name, SUM(total_cost_usd) AS model_spend
+  FROM `my-gcp-project.finops.agent_costs`
+  WHERE scope = 'session' AND model_name IS NOT NULL
+  GROUP BY 1;
+  ```
+
+---
+
 ### Standalone Exporter Usage
 
 You can also use `BigQueryExporter` directly in any Python script, background pipeline, or custom framework:
