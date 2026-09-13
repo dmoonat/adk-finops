@@ -315,24 +315,22 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
 │                                                                              │
 │  Scope           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
 │  ──────────────────────────────────────────────────────────────────          │
-│  Current Turn        3   28,400    $0.0289     $0.0280      $0.0569          │
-│  Session Total       3   28,400    $0.0289     $0.0280      $0.0569          │
+│  Current Turn        2   10,100    $0.0053     $0.0280      $0.0333          │
+│  Session Total       2   10,100    $0.0053     $0.0280      $0.0333          │
 │                                                                              │
-│  💰 Context Caching Savings: $0.0016 saved (2.8% reduction from $0.0585 gross)│
+│  💰 Context Caching Savings: $0.0016 saved (4.6% reduction from $0.0349 gross)│
 │                                                                              │
 │  Model              Calls   Tokens (In / Out)   Cost (USD)    Cache Savings  │
 │  ──────────────────────────────────────────────────────────────────────────  │
 │  gemini-2.5-pro         1         1,200 / 300      $0.0030                —  │
 │  gemini-2.5-flash       1         8,000 / 600      $0.0023   $0.0016 (41.5%) │
-│  codemender             1      15,000 / 3,300      $0.0236                —  │
 │                                                                              │
 │  Agent           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
 │  ──────────────────────────────────────────────────────────────────          │
 │  🤖 supervisor       1    1,500    $0.0030       $0.00      $0.0030          │
 │  🤖 researcher       1    8,600    $0.0023     $0.0280      $0.0303          │
-│  🤖 coder            1   18,300    $0.0236       $0.00      $0.0236          │
 │                                                                              │
-│  🛡️  Budget Guard: $0.0569 / $1.0000 (5.7% utilized)                         │
+│  🛡️  Budget Guard: $0.0333 / $1.0000 (3.3% utilized)                         │
 ╰───────────────── adk-finops • Universal Token & Cost Engine ─────────────────╯
 ```
 
