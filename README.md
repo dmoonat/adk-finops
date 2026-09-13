@@ -511,13 +511,16 @@ Per Google Cloud pricing rules:
 
 ## Standalone Usage (Without ADK)
 
-You can use `CostTracker` in any Python script, background worker, or web service:
+`adk-finops` is designed to be used in **any Python application** — FastAPI/Flask backends, Celery/Ray background pipelines, LangChain/LlamaIndex workflows, or raw Google GenAI SDK scripts — without requiring Google ADK.
+
+> 📁 **Ready-to-run examples:** See the [`examples/standalone/`](examples/standalone/) folder or the [`standalone_finops_demo/`](../standalone_finops_demo/) workspace.
 
 ```python
-from adk_finops import CostTracker
+from adk_finops import CostTracker, BigQueryExporter
 
 # Wrap any execution block with automatic lifecycle cleanup
 with CostTracker.track_run("request_123"):
+    # Record Gemini 2.5 call with thoughts/reasoning tokens
     CostTracker.record_usage(
         run_id="request_123",
         model_name="gemini-2.5-flash",
@@ -526,10 +529,23 @@ with CostTracker.track_run("request_123"):
         thoughts_tokens=100,
         cached_tokens=0,
     )
+    # Record grounding or tool fee ($0.014 / query)
+    CostTracker.record_tool_call(
+        run_id="request_123",
+        tool_name="google_search",
+    )
 
+# Print color-coded terminal summary box
+CostTracker.print_summary("request_123")
+
+# Get structured metrics dictionary
 summary = CostTracker.get_summary("request_123")
 print(f"Total Cost: ${summary['total_cost_usd']:.6f}")
 print(f"Total Tokens: {summary['total_tokens']}")
+
+# (Optional) Export to BigQuery in 1 line
+# exporter = BigQueryExporter("my-project.finops.agent_costs")
+# exporter.export_summary(summary)
 ```
 
 ---

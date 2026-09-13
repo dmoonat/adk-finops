@@ -113,6 +113,14 @@ class CostTracker:
             cls._registry.set_global_discount(discount_percent)
 
     @classmethod
+    def reset(cls) -> None:
+        """Clears all active runs, budgets, and resets global state."""
+        with cls._lock:
+            cls._active_runs.clear()
+            cls._budgets.clear()
+            cls._global_budget.clear()
+
+    @classmethod
     def reset_budgets(cls) -> None:
         """Clears all configured session, turn, and agent budgets."""
         with cls._lock:
@@ -126,17 +134,24 @@ class CostTracker:
         session_limit_usd: float | None = None,
         turn_limit_usd: float | None = None,
         agent_limits_usd: dict[str, float] | None = None,
+        session_budget_usd: float | None = None,
+        turn_budget_usd: float | None = None,
+        agent_budgets: dict[str, float] | None = None,
     ) -> None:
         """Configures budget limits in USD globally or for a specific session/agent."""
+        eff_session_limit = session_limit_usd if session_limit_usd is not None else session_budget_usd
+        eff_turn_limit = turn_limit_usd if turn_limit_usd is not None else turn_budget_usd
+        eff_agent_limits = agent_limits_usd if agent_limits_usd is not None else agent_budgets
+
         with cls._lock:
             target = cls._budgets.setdefault(session_id, {}) if session_id else cls._global_budget
-            if session_limit_usd is not None:
-                target["session"] = float(session_limit_usd)
-            if turn_limit_usd is not None:
-                target["turn"] = float(turn_limit_usd)
-            if agent_limits_usd is not None:
+            if eff_session_limit is not None:
+                target["session"] = float(eff_session_limit)
+            if eff_turn_limit is not None:
+                target["turn"] = float(eff_turn_limit)
+            if eff_agent_limits is not None:
                 current_agents = target.setdefault("agents", {})
-                for a_name, a_limit in agent_limits_usd.items():
+                for a_name, a_limit in eff_agent_limits.items():
                     current_agents[a_name] = float(a_limit)
 
     @classmethod
