@@ -410,9 +410,16 @@ class CostTracker:
                     "gross_cost_usd": 0.0,
                     "savings_usd": 0.0,
                     "savings_pct": 0.0,
+                    "models": [],
+                    "model_name": None,
                 },
             )
             a["calls"] += 1
+            if "models" not in a:
+                a["models"] = []
+            if model_name not in a["models"]:
+                a["models"].append(model_name)
+            a["model_name"] = a["models"][0] if len(a["models"]) == 1 else ", ".join(a["models"])
             a["prompt_tokens"] += prompt_tokens
             a["completion_tokens"] += completion_tokens
             a["thoughts_tokens"] = a.get("thoughts_tokens", 0) + thoughts_tokens

@@ -237,6 +237,10 @@ class BigQueryExporter(BaseExporter):
 
         for scope_name, scope_data in scopes_to_export:
             # 1. Primary scope aggregate row
+            # If all calls in this scope used a single model, populate model_name
+            models_used = list(scope_data.get("breakdown_by_model", {}).keys())
+            scope_model = models_used[0] if len(models_used) == 1 else None
+
             rows.append(
                 self._serialize_row(
                     scope_data=scope_data,
@@ -244,11 +248,13 @@ class BigQueryExporter(BaseExporter):
                     session_id=session_id,
                     turn_id=turn_id,
                     budget_info=budget_info,
+                    agent_name=None,  # NULL signifies the overall aggregate for this scope
+                    model_name=scope_model,
                     tags=tags,
                 )
             )
 
-            # 2. Per-Agent rows (for direct SQL filtering by agent)
+            # 2. Per-Agent rows (for direct SQL filtering by agent and model)
             agent_breakdown = scope_data.get("breakdown_by_agent", {})
             for a_name, a_data in agent_breakdown.items():
                 rows.append(
@@ -259,9 +265,27 @@ class BigQueryExporter(BaseExporter):
                         turn_id=turn_id,
                         budget_info=budget_info,
                         agent_name=a_name,
+                        model_name=a_data.get("model_name"),
                         tags=tags,
                     )
                 )
+
+            # 3. If there are NO agents (e.g. standalone script without agent_name)
+            # and multiple models were used, export per-model rows so model_name is never lost!
+            if not agent_breakdown and len(models_used) > 1:
+                for m_name, m_data in scope_data.get("breakdown_by_model", {}).items():
+                    rows.append(
+                        self._serialize_row(
+                            scope_data=m_data,
+                            scope_name=scope_name,
+                            session_id=session_id,
+                            turn_id=turn_id,
+                            budget_info=budget_info,
+                            agent_name=None,
+                            model_name=m_name,
+                            tags=tags,
+                        )
+                    )
 
         return rows
 
