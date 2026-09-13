@@ -24,6 +24,7 @@ Hooks directly into the Google ADK BasePlugin lifecycle to transparently track:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,10 @@ class FinOpsCostPlugin(BasePlugin):
         on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
         fallback_model: str = "gemini-2.5-flash",
         render_terminal_box: bool = True,
+        bigquery_table: str | None = None,
+        bigquery_export_scope: str = "session",  # "session", "turn", or "both"
+        bigquery_tags: dict[str, Any] | None = None,
+        bigquery_auto_create_table: bool = True,
     ):
         super().__init__(name=name)
         self.default_model = default_model
@@ -69,6 +74,19 @@ class FinOpsCostPlugin(BasePlugin):
         self.on_budget_exceeded = on_budget_exceeded.lower()
         self.fallback_model = fallback_model
         self.render_terminal_box = render_terminal_box
+        self.bigquery_table = bigquery_table or os.getenv("ADK_FINOPS_BIGQUERY_TABLE")
+        self.bigquery_export_scope = bigquery_export_scope.lower()
+        self.bigquery_tags = bigquery_tags
+        self.bigquery_auto_create_table = bigquery_auto_create_table
+        self.bq_exporter = None
+
+        if self.bigquery_table:
+            from .exporters.bigquery import BigQueryExporter
+
+            self.bq_exporter = BigQueryExporter(
+                table_id=self.bigquery_table,
+                auto_create_table=self.bigquery_auto_create_table,
+            )
 
         # Configure budgets in CostTracker if specified
         if budget_limit_usd is not None or turn_budget_limit_usd is not None or agent_budgets is not None:
@@ -344,3 +362,16 @@ class FinOpsCostPlugin(BasePlugin):
                 from .display import print_summary
 
                 print_summary(summary)
+
+            if self.bq_exporter:
+                self.bq_exporter.export_summary(
+                    summary=summary,
+                    scope=self.bigquery_export_scope,
+                    tags=self.bigquery_tags,
+                    blocking=False,
+                )
+
+    def close(self) -> None:
+        """Flushes and shuts down exporter background workers."""
+        if self.bq_exporter:
+            self.bq_exporter.close()

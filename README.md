@@ -33,8 +33,10 @@
 - [Standalone Usage (Without ADK)](#standalone-usage-without-adk)
 - [Configuration Reference](#configuration-reference)
 - [Built-In Model Rate Cards](#built-in-model-rate-cards)
-- [Coming Soon](#coming-soon)
-  - [One-Line BigQuery Exporter](#-one-line-bigquery-exporter)
+- [One-Line BigQuery Exporter](#one-line-bigquery-exporter)
+  - [Zero-Boilerplate Schema Management](#zero-boilerplate-schema-management)
+  - [Standalone Exporter Usage](#standalone-exporter-usage)
+  - [Sample SQL Queries for Looker Studio](#sample-sql-queries-for-looker-studio)
 - [License](#license)
 
 ---
@@ -72,6 +74,21 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 ### From PyPI
 ```bash
 pip install adk-finops
+```
+
+### With Rich Terminal Summary
+```bash
+pip install "adk-finops[rich]"
+```
+
+### With BigQuery Exporter
+```bash
+pip install "adk-finops[bigquery]"
+```
+
+### Full Enterprise Suite (ADK + Rich + BigQuery)
+```bash
+pip install "adk-finops[all]"
 ```
 
 ### With Google ADK
@@ -582,24 +599,132 @@ The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) cont
 
 ---
 
-## Coming Soon
+## One-Line BigQuery Exporter
 
-We are actively expanding `adk-finops` with enterprise-grade data warehouse integrations and analytics:
-
-### 📊 One-Line BigQuery Exporter
-
-Stream or batch-export turn, session, model, and sub-agent FinOps telemetry directly into a Google BigQuery dataset with a single configuration line:
+Stream turn, session, model, and sub-agent FinOps telemetry directly into a Google BigQuery dataset with a single configuration parameter:
 
 ```python
+from adk_finops import FinOpsCostPlugin
+
 finops_plugin = FinOpsCostPlugin(
-    default_model="gemini-2.5-pro",
-    bigquery_table="my-gcp-project.finops.agent_costs",  # Coming soon!
+    default_model="gemini-2.5-flash",
+    bigquery_table="my-gcp-project.finops.agent_costs",
+    bigquery_export_scope="both",  # "session" (default), "turn", or "both"
+    bigquery_tags={"env": "production", "service": "support-agent"},
 )
 ```
 
-- **Zero-Boilerplate Schema Management**: Automatically provisions and manages partitioned and clustered BigQuery telemetry tables.
-- **Enterprise Reporting & Looker Dashboards**: Power real-time Looker Studio / Looker dashboards for department chargebacks, multi-tenant billing, and cost center attribution.
-- **Historical ROI & Trend Analytics**: Track cache hit rates, prompt growth, and grounding fee trends across millions of agent interactions over time.
+> [!TIP]
+> **Environment Variable Auto-Discovery**: You can also set `ADK_FINOPS_BIGQUERY_TABLE="my-gcp-project.finops.agent_costs"` in your environment or `.env` file to enable BigQuery streaming without changing a single line of application code!
+
+---
+
+### Zero-Boilerplate Schema Management
+
+When `bigquery_table` is specified, `adk-finops` automatically inspects and provisions the dataset and table with enterprise best practices:
+
+- **Partitioning**: Day-partitioned on `timestamp` to optimize query performance and reduce scan costs.
+- **Clustering**: Clustered by `[session_id, agent_name, model_name]` for sub-second filtering in Looker Studio and BI tools.
+- **Non-Blocking Background Streaming**: Ingestion runs asynchronously in a background thread pool, adding **zero latency** to agent responses.
+
+#### Table Schema Reference
+
+| Field Name | Type | Description |
+| :--- | :--- | :--- |
+| `timestamp` | `TIMESTAMP` | Event timestamp in UTC (Partition Key) |
+| `session_id` | `STRING` | ADK Session ID (Clustering Key #1) |
+| `turn_id` | `STRING` | ADK Turn / Invocation ID |
+| `scope` | `STRING` | Record scope: `"turn"` or `"session"` |
+| `agent_name` | `STRING` | Attributed Agent name (Clustering Key #2) |
+| `model_name` | `STRING` | Model name / version (Clustering Key #3) |
+| `prompt_tokens` | `INTEGER` | Input prompt token count |
+| `completion_tokens` | `INTEGER` | Output candidate token count |
+| `thoughts_tokens` | `INTEGER` | Gemini 2.5 thinking token count |
+| `cached_tokens` | `INTEGER` | Context cached token count |
+| `total_tokens` | `INTEGER` | Total billable tokens |
+| `llm_cost_usd` | `FLOAT` | Net LLM API cost in USD |
+| `tool_cost_usd` | `FLOAT` | Search & Grounding fees in USD |
+| `total_cost_usd` | `FLOAT` | Total net cost in USD |
+| `gross_cost_usd` | `FLOAT` | Gross cost before caching discount |
+| `savings_usd` | `FLOAT` | Dollars saved via context caching |
+| `savings_pct` | `FLOAT` | Percentage saved via context caching |
+| `tool_calls_count` | `INTEGER` | Number of billable grounding/tool calls |
+| `budget_limit_usd` | `FLOAT` | Configured budget threshold |
+| `budget_utilization_pct` | `FLOAT` | Budget utilization percentage |
+| `budget_exceeded` | `BOOLEAN` | Whether budget guard was tripped |
+| `breakdown_by_agent` | `JSON` | Multi-agent attribution snapshot |
+| `breakdown_by_model` | `JSON` | Model distribution snapshot |
+| `tags` | `JSON` | User-provided tags (e.g. `env`, `tenant_id`) |
+
+---
+
+### Standalone Exporter Usage
+
+You can also use `BigQueryExporter` directly in any Python script, background pipeline, or custom framework:
+
+```python
+from adk_finops import CostTracker
+from adk_finops.exporters import BigQueryExporter
+
+exporter = BigQueryExporter(
+    table_id="my-gcp-project.finops.agent_costs",
+    auto_create_table=True,
+)
+
+with CostTracker.track_run("batch_job_42"):
+    CostTracker.record_usage(
+        run_id="batch_job_42",
+        model_name="gemini-2.5-pro",
+        prompt_tokens=15000,
+        completion_tokens=800,
+        cached_tokens=12000,
+        agent_name="data_extractor",
+    )
+
+summary = CostTracker.get_summary("batch_job_42")
+exporter.export_summary(summary, scope="session", tags={"env": "prod", "pipeline": "etl"})
+```
+
+---
+
+### Sample SQL Queries for Looker Studio
+
+Once data streams into BigQuery, power executive dashboards and chargeback reports with standard SQL:
+
+#### 1. Top 5 Most Expensive Agents by LLM & Grounding Spend
+```sql
+SELECT
+  agent_name,
+  COUNT(DISTINCT session_id) AS total_sessions,
+  SUM(total_tokens) AS total_tokens,
+  ROUND(SUM(llm_cost_usd), 4) AS llm_cost,
+  ROUND(SUM(tool_cost_usd), 4) AS grounding_fees,
+  ROUND(SUM(total_cost_usd), 4) AS total_spend,
+  ROUND(SUM(savings_usd), 4) AS caching_dollars_saved
+FROM `my-gcp-project.finops.agent_costs`
+WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+  AND agent_name IS NOT NULL
+GROUP BY 1
+ORDER BY total_spend DESC
+LIMIT 5;
+```
+
+#### 2. Context Caching Savings & ROI by Model
+```sql
+SELECT
+  model_name,
+  SUM(cached_tokens) AS total_cached_tokens,
+  ROUND(SUM(gross_cost_usd), 4) AS gross_spend_without_cache,
+  ROUND(SUM(total_cost_usd), 4) AS actual_net_spend,
+  ROUND(SUM(savings_usd), 4) AS net_dollars_saved,
+  ROUND(SAFE_DIVIDE(SUM(savings_usd), SUM(gross_cost_usd)) * 100, 1) AS overall_savings_pct
+FROM `my-gcp-project.finops.agent_costs`
+WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+  AND scope = 'session'
+  AND agent_name IS NULL
+GROUP BY 1
+ORDER BY net_dollars_saved DESC;
+```
 
 ---
 

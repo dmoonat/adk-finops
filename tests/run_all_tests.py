@@ -27,6 +27,7 @@ import test_budget
 import test_savings
 import test_multi_agent
 import test_display
+import test_bigquery_exporter
 
 modules = [
     test_rate_card,
@@ -36,6 +37,7 @@ modules = [
     test_savings,
     test_multi_agent,
     test_display,
+    test_bigquery_exporter,
 ]
 
 async def run_all():

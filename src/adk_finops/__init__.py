@@ -41,4 +41,11 @@ except ImportError:
         "format_summary_box",
     ]
 
+try:
+    from .exporters import BigQueryExporter
+
+    __all__.append("BigQueryExporter")
+except ImportError:
+    pass
+
 from ._version import __version__

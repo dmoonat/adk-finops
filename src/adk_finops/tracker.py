@@ -453,6 +453,7 @@ class CostTracker:
                     "savings_pct": 0.0,
                 },
             )
+            a["tool_calls"] = a.get("tool_calls", 0) + count
             a["tool_cost_usd"] = round(a["tool_cost_usd"] + total_tool_fee, 7)
             a["total_cost_usd"] = round(a["total_cost_usd"] + total_tool_fee, 7)
             a["gross_cost_usd"] = round(a.get("gross_cost_usd", 0.0) + total_tool_fee, 7)

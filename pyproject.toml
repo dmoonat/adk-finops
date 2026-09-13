@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "adk-finops"
-version = "0.1.2"
+version = "0.2.0"
 description = "Universal LLM FinOps cost and token tracking plugin for Google Agent Development Kit (ADK) and Python agent frameworks."
 readme = "README.md"
 license = "Apache-2.0"
@@ -44,10 +44,19 @@ adk = [
 rich = [
     "rich>=13.0.0"
 ]
+bigquery = [
+    "google-cloud-bigquery>=3.0.0"
+]
+all = [
+    "google-adk>=0.1.0",
+    "rich>=13.0.0",
+    "google-cloud-bigquery>=3.0.0"
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.20.0",
-    "rich>=13.0.0"
+    "rich>=13.0.0",
+    "google-cloud-bigquery>=3.0.0"
 ]
 
 [project.urls]

@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dynamic version resolution for adk-finops."""
+"""Telemetry exporters for adk-finops."""
+
+from .base import BaseExporter
 
 try:
-    from importlib.metadata import version as _get_version
-    __version__ = _get_version("adk-finops")
-except Exception:
-    # Fallback when running from an uninstalled source tree
-    __version__ = "0.2.0"
+    from .bigquery import BigQueryExporter
+
+    __all__ = ["BaseExporter", "BigQueryExporter"]
+except ImportError:
+    __all__ = ["BaseExporter"]
