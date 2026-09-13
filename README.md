@@ -16,6 +16,9 @@
 - [Installation](#installation)
 - [Quickstart with Google ADK](#quickstart-with-google-adk)
 - [Dual-Scope Telemetry: Turn vs. Session](#dual-scope-telemetry-turn-vs-session)
+- [Budget Guards & Circuit Breakers](#budget-guards--circuit-breakers)
+- [Context Caching Savings Analytics (ROI Tracker)](#context-caching-savings-analytics-roi-tracker)
+- [Multi-Agent Cost Attribution & Delegation Tracking](#multi-agent-cost-attribution--delegation-tracking)
 - [Decoupled Rate Cards (Custom & Enterprise Pricing)](#decoupled-rate-cards-custom--enterprise-pricing)
   - [1. Custom JSON Rate Card](#1-custom-json-rate-card)
   - [2. Environment Variable](#2-environment-variable)
@@ -49,6 +52,8 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 
 - **Native Google ADK Integration**: Intercepts model and tool invocations via the ADK `BasePlugin` lifecycle (`before_run`, `after_model`, `on_event`, `after_tool`, `after_run`).
 - **Dual-Scope Accounting**: Simultaneously tracks metrics for both the **active turn** (all calls within a user message) and the **cumulative session** (entire conversation history).
+- **Budget Guards & Circuit Breakers**: Set hard session and turn USD spending limits. Prevent runaway bills by halting execution, emitting warnings, or automatically downgrading expensive models (e.g. Gemini 2.5 Pro → Flash) when limits are breached.
+- **Context Caching Savings ROI**: Demonstrates financial value by tracking gross cost (cost without caching) vs. actual net cost, reporting exact dollars and percentage saved (e.g. up to 90% savings via Gemini Context Caching).
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
 - **Enterprise Volume Discounts**: Configure global or provider-specific discount multipliers (e.g., 15% Google Cloud negotiated discount).
 - **Accurate Thinking Tokens**: Automatically captures and bills `thoughts_token_count` at the output rate while displaying thinking tokens separately in reports.
@@ -169,6 +174,133 @@ Run your agent with `adk web` or `adk run`. Telemetry will log directly to the t
     "total_cost_usd": 0.0135785
   }
 }
+```
+
+---
+
+## Budget Guards & Circuit Breakers
+
+Prevent runaway agent loops and surprise bills with proactive budget enforcement. Set hard USD spending limits per session or per turn:
+
+```python
+from adk_finops import FinOpsCostPlugin
+
+finops_plugin = FinOpsCostPlugin(
+    default_model="gemini-2.5-pro",
+    budget_limit_usd=1.00,             # Hard stop at $1.00 per chat session
+    turn_budget_limit_usd=0.25,        # Maximum $0.25 on any single turn
+    on_budget_exceeded="halt",         # Action: "halt", "warn", or "downgrade"
+    fallback_model="gemini-2.5-flash", # Target model when using "downgrade"
+)
+```
+
+### Enforcement Modes
+
+| Mode | Behavior | Best Used For |
+| :--- | :--- | :--- |
+| **`"halt"`** *(default)* | Halts execution immediately, raises `BudgetExceededError` or returns a safe warning message in ADK to block further model calls. | Production safeguards, preventing runaway costs. |
+| **`"downgrade"`** | Automatically downgrades the agent's model to `fallback_model` (e.g. Gemini 2.5 Pro → Flash) once the budget threshold is reached. | Graceful service degradation with zero user downtime. |
+| **`"warn"`** | Logs a warning and marks `exceeded: True` in session state (`finops_cost.budget`) without interrupting the user. | Soft monitoring and alerting. |
+
+---
+
+## Context Caching Savings Analytics (ROI Tracker)
+
+Context caching can reduce prompt token costs by up to 90%. `adk-finops` automatically calculates **Gross Cost** (what you would have paid without caching), **Actual Net Cost**, and **Total Savings**:
+
+```json
+{
+  "total_cost_usd": 0.00334,
+  "gross_cost_usd": 0.00550,
+  "savings_usd": 0.00216,
+  "savings_pct": 39.3,
+  "cached_tokens": 8000
+}
+```
+
+Real-time stdout log highlight:
+```text
+[FinOps LLM] turn=turn_1 model=gemini-2.5-flash tokens=11000 cost=$0.003340 | 💰 Saved $0.002160 (39.3%) via Context Caching
+[FinOps Summary] Turn cost=$0.003340 | Session cost=$0.003340 | 💰 Total Saved: $0.002160 (39.3%) via Caching
+```
+
+---
+
+## Multi-Agent Cost Attribution & Delegation Tracking
+
+In hierarchical multi-agent architectures (e.g., a `supervisor` delegating subtasks to a `researcher` and a `coder`), each agent makes distinct model calls, executes different tools, and consumes different context windows. Without granular attribution, teams cannot identify which sub-agent is driving 80% of costs or entering a costly reasoning loop.
+
+`adk-finops` automatically attributes every LLM invocation, thinking token, context caching savings, and tool fee to the specific agent executing the task, with optional per-agent budget limits:
+
+```python
+from adk_finops import FinOpsCostPlugin
+
+finops_plugin = FinOpsCostPlugin(
+    default_model="gemini-2.5-pro",
+    budget_limit_usd=2.00,             # Total session cap: $2.00
+    agent_budgets={
+        "researcher": 0.50,            # Cap researcher at $0.50
+        "coder": 1.00,                 # Cap coder at $1.00
+    },
+    on_budget_exceeded="halt",         # Halt if any agent breaches its limit
+)
+```
+
+### Agent Breakdown in Session Telemetry
+
+Every turn and session summary includes a granular `breakdown_by_agent` dictionary:
+
+```json
+{
+  "breakdown_by_agent": {
+    "supervisor": {
+      "calls": 1,
+      "prompt_tokens": 1000,
+      "completion_tokens": 200,
+      "thoughts_tokens": 0,
+      "cached_tokens": 0,
+      "total_tokens": 1200,
+      "llm_cost_usd": 0.00225,
+      "tool_cost_usd": 0.0,
+      "total_cost_usd": 0.00225,
+      "savings_usd": 0.0
+    },
+    "researcher": {
+      "calls": 2,
+      "prompt_tokens": 4000,
+      "completion_tokens": 500,
+      "thoughts_tokens": 0,
+      "cached_tokens": 2000,
+      "total_tokens": 4500,
+      "llm_cost_usd": 0.00189,
+      "tool_cost_usd": 0.028,
+      "total_cost_usd": 0.02989,
+      "savings_usd": 0.00054,
+      "savings_pct": 22.2
+    },
+    "coder": {
+      "calls": 1,
+      "prompt_tokens": 8000,
+      "completion_tokens": 1500,
+      "thoughts_tokens": 300,
+      "cached_tokens": 0,
+      "total_tokens": 9800,
+      "llm_cost_usd": 0.01275,
+      "tool_cost_usd": 0.0,
+      "total_cost_usd": 0.01275,
+      "savings_usd": 0.0
+    }
+  }
+}
+```
+
+### Real-Time Terminal Logs
+
+```text
+[FinOps LLM] turn=turn_1 session=sess_1 agent=supervisor model=gemini-2.5-pro tokens=1200 cost=$0.002250
+[FinOps Grounding] turn=turn_1 session=sess_1 agent=researcher tool=google_search fee=$0.014000
+[FinOps LLM] turn=turn_1 session=sess_1 agent=researcher model=gemini-2.5-flash tokens=4500 cost=$0.001890 | 💰 Saved $0.000540 (22.2%) via Context Caching
+[FinOps Agents] supervisor: $0.0023 (1200 tok) | researcher: $0.0299 (4500 tok) | coder: $0.0128 (9800 tok)
 ```
 
 ---
@@ -312,8 +444,24 @@ FinOpsCostPlugin(
     rate_card_path: str | Path | None = None,
     rate_card: dict[str, Any] | None = None,
     discount_percent: float | None = None,
+    budget_limit_usd: float | None = None,
+    turn_budget_limit_usd: float | None = None,
+    agent_budgets: dict[str, float] | None = None,
+    on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
+    fallback_model: str = "gemini-2.5-flash",
 )
 ```
+
+| Parameter | Type | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `default_model` | `str` | `"gemini-2.5-flash"` | Fallback model name if not reported by the LLM response. |
+| `rate_card_path` | `str \| Path` | `None` | Path to custom rate card JSON file. |
+| `discount_percent` | `float` | `None` | Enterprise volume discount percentage (e.g. `15.0` for 15%). |
+| `budget_limit_usd` | `float` | `None` | Maximum cumulative spending limit in USD for the entire chat session. |
+| `turn_budget_limit_usd` | `float` | `None` | Maximum spending limit in USD for any single user turn. |
+| `agent_budgets` | `dict[str, float]` | `None` | Per-agent spending caps in USD (e.g. `{"researcher": 0.50, "coder": 1.00}`). |
+| `on_budget_exceeded` | `str` | `"halt"` | Action on budget breach: `"halt"` (raise/block), `"warn"`, or `"downgrade"`. |
+| `fallback_model` | `str` | `"gemini-2.5-flash"` | Target model when using `"downgrade"` mode. |
 
 ---
 

@@ -35,7 +35,7 @@ from google.adk.tools import BaseTool
 from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 
-from .tracker import CostTracker
+from .tracker import BudgetExceededError, CostTracker
 
 logger = logging.getLogger("adk_finops.plugin")
 
@@ -43,7 +43,8 @@ logger = logging.getLogger("adk_finops.plugin")
 class FinOpsCostPlugin(BasePlugin):
     """Native Google ADK Plugin that intercepts model calls and tool executions
 
-    to track tokens, context caching, thinking tokens, and grounding fees.
+    to track tokens, context caching, thinking tokens, and grounding fees,
+    with built-in budget guardrails and circuit breakers.
     """
 
     def __init__(
@@ -53,9 +54,27 @@ class FinOpsCostPlugin(BasePlugin):
         rate_card_path: str | Path | None = None,
         rate_card: dict[str, Any] | None = None,
         discount_percent: float | None = None,
+        budget_limit_usd: float | None = None,
+        turn_budget_limit_usd: float | None = None,
+        agent_budgets: dict[str, float] | None = None,
+        on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
+        fallback_model: str = "gemini-2.5-flash",
     ):
         super().__init__(name=name)
         self.default_model = default_model
+        self.budget_limit_usd = budget_limit_usd
+        self.turn_budget_limit_usd = turn_budget_limit_usd
+        self.agent_budgets = agent_budgets
+        self.on_budget_exceeded = on_budget_exceeded.lower()
+        self.fallback_model = fallback_model
+
+        # Configure budgets in CostTracker if specified
+        if budget_limit_usd is not None or turn_budget_limit_usd is not None or agent_budgets is not None:
+            CostTracker.set_budget(
+                session_limit_usd=budget_limit_usd,
+                turn_limit_usd=turn_budget_limit_usd,
+                agent_limits_usd=agent_budgets,
+            )
 
         # Apply custom rate card configuration if provided
         if rate_card_path:
@@ -76,22 +95,71 @@ class FinOpsCostPlugin(BasePlugin):
         session_id = session_id or turn_id
         return turn_id, session_id
 
+    def _extract_agent_name(self, ctx: Any) -> str:
+        """Extracts the agent name from callback/invocation/tool context."""
+        agent_name = getattr(ctx, "agent_name", None)
+        if isinstance(agent_name, str) and agent_name:
+            return agent_name
+
+        agent = getattr(ctx, "agent", None)
+        if agent is not None:
+            name = getattr(agent, "name", None)
+            if isinstance(name, str) and name:
+                return name
+
+        inv_ctx = getattr(ctx, "invocation_context", None)
+        if inv_ctx is not None:
+            agent = getattr(inv_ctx, "agent", None)
+            if agent is not None:
+                name = getattr(agent, "name", None)
+                if isinstance(name, str) and name:
+                    return name
+
+        return "root_agent"
+
     async def before_run_callback(
         self, *, invocation_context: InvocationContext
     ) -> types.Content | None:
-        """Initializes a FinOps tracking run for the current turn and session."""
+        """Initializes a FinOps tracking run and evaluates budget guardrails."""
         turn_id, session_id = self._extract_ids(invocation_context)
         CostTracker.start_turn(turn_id=turn_id, session_id=session_id)
         msg = f"[FinOps] Initialized cost tracking: turn={turn_id[:8]} session={session_id[:8]}"
         print(msg, flush=True)
         logger.info(msg)
+
+        # Pre-flight Budget Guard check: Halt or downgrade if session is already over budget
+        is_exceeded, reason, status = CostTracker.check_budget(run_id=turn_id, session_id=session_id)
+        if is_exceeded:
+            if self.on_budget_exceeded == "halt":
+                halt_msg = f"⚠️ [FinOps Budget Guard] Turn blocked: {reason}."
+                print(halt_msg, flush=True)
+                logger.warning(halt_msg)
+                return types.Content(
+                    parts=[
+                        types.Part.from_text(
+                            text=f"⚠️ {reason}. Turn was halted to prevent unexpected charges."
+                        )
+                    ]
+                )
+            elif self.on_budget_exceeded == "downgrade":
+                if hasattr(invocation_context, "agent") and self.fallback_model:
+                    invocation_context.agent.model = self.fallback_model
+                    msg = f"⚠️ [FinOps Budget Guard] Downgraded agent model to {self.fallback_model}: {reason}."
+                    print(msg, flush=True)
+                    logger.warning(msg)
+            else:  # "warn"
+                msg = f"⚠️ [FinOps Budget Guard] Warning: {reason}."
+                print(msg, flush=True)
+                logger.warning(msg)
+
         return None
 
     async def after_model_callback(
         self, *, callback_context: CallbackContext, llm_response: LlmResponse
     ) -> LlmResponse | None:
-        """Intercepts Gemini LLM responses to record token usage and cost for turn and session."""
+        """Intercepts Gemini LLM responses to record token usage, cost, and budget limits."""
         turn_id, session_id = self._extract_ids(callback_context)
+        agent_name = self._extract_agent_name(callback_context)
 
         usage = getattr(llm_response, "usage_metadata", None)
         model_name = getattr(llm_response, "model_version", None) or self.default_model
@@ -110,15 +178,47 @@ class FinOpsCostPlugin(BasePlugin):
                 completion_tokens=completion_tokens,
                 thoughts_tokens=thoughts_tokens,
                 cached_tokens=cached_tokens,
-                task_name=getattr(callback_context, "agent_name", "adk_agent"),
+                task_name=agent_name,
+                agent_name=agent_name,
             )
+            savings_str = ""
+            if record.get("savings_usd", 0.0) > 0:
+                savings_str = f" | 💰 Saved ${record['savings_usd']:.6f} ({record['savings_pct']}%) via Context Caching"
+
             msg = (
-                f"[FinOps LLM] turn={turn_id[:8]} session={session_id[:8]} model={model_name} "
-                f"tokens={record.get('total_tokens')} (prompt={prompt_tokens}, completion={completion_tokens}, thoughts={thoughts_tokens}) "
-                f"cost=${record.get('cost_usd', 0.0):.6f}"
+                f"[FinOps LLM] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} model={model_name} "
+                f"tokens={record.get('total_tokens')} (prompt={prompt_tokens}, completion={completion_tokens}, thoughts={thoughts_tokens}, cached={cached_tokens}) "
+                f"cost=${record.get('cost_usd', 0.0):.6f}{savings_str}"
             )
             print(msg, flush=True)
             logger.info(msg)
+
+            # Post-model Budget Guard check
+            is_exceeded, reason, status = CostTracker.check_budget(
+                run_id=turn_id, session_id=session_id, agent_name=agent_name
+            )
+            if is_exceeded:
+                if self.on_budget_exceeded == "halt":
+                    msg = f"⚠️ [FinOps Budget Guard] {reason}"
+                    print(msg, flush=True)
+                    logger.warning(msg)
+                    raise BudgetExceededError(
+                        message=reason or "Budget limit exceeded",
+                        current_cost_usd=status.get("current_cost_usd", 0.0),
+                        budget_limit_usd=status.get("budget_limit_usd", 0.0),
+                        scope=status.get("scope", "session"),
+                        session_id=session_id,
+                    )
+                elif self.on_budget_exceeded == "downgrade":
+                    if hasattr(callback_context, "agent") and self.fallback_model:
+                        callback_context.agent.model = self.fallback_model
+                    msg = f"⚠️ [FinOps Budget Guard] Budget limit reached; subsequent model calls downgraded to {self.fallback_model}."
+                    print(msg, flush=True)
+                    logger.warning(msg)
+                else:  # "warn"
+                    msg = f"⚠️ [FinOps Budget Guard] Warning: {reason}"
+                    print(msg, flush=True)
+                    logger.warning(msg)
 
         return None
 
@@ -146,6 +246,7 @@ class FinOpsCostPlugin(BasePlugin):
     ) -> dict | None:
         """Intercepts tool executions to record Search and Grounding fees for turn and session."""
         turn_id, session_id = self._extract_ids(tool_context)
+        agent_name = self._extract_agent_name(tool_context)
         tool_name = getattr(tool, "name", "tool")
         clean_name = tool_name.strip().lower()
         tool_class_name = tool.__class__.__name__.lower()
@@ -175,8 +276,9 @@ class FinOpsCostPlugin(BasePlugin):
                 tool_name=tool_type,
                 count=1,
                 task_name=tool_name,
+                agent_name=agent_name,
             )
-            msg = f"[FinOps Grounding] turn={turn_id[:8]} session={session_id[:8]} tool={tool_name} fee=${cost:.6f}"
+            msg = f"[FinOps Grounding] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}"
             print(msg, flush=True)
             logger.info(msg)
 
@@ -215,9 +317,23 @@ class FinOpsCostPlugin(BasePlugin):
 
             turn_info = summary.get("turn", {})
             sess_info = summary.get("session", {})
+            savings_info = ""
+            if sess_info.get("savings_usd", 0.0) > 0:
+                savings_info = f" | 💰 Total Saved: ${sess_info['savings_usd']:.6f} ({sess_info.get('savings_pct', 0.0)}%) via Caching"
+
             msg = (
                 f"[FinOps Summary] Turn tokens={turn_info.get('total_tokens', 0)} cost=${turn_info.get('total_cost_usd', 0.0):.6f} | "
-                f"Session tokens={sess_info.get('total_tokens', 0)} cost=${sess_info.get('total_cost_usd', 0.0):.6f}"
+                f"Session tokens={sess_info.get('total_tokens', 0)} cost=${sess_info.get('total_cost_usd', 0.0):.6f}{savings_info}"
             )
             print(msg, flush=True)
             logger.info(msg)
+
+            agent_breakdown = sess_info.get("breakdown_by_agent", {})
+            if agent_breakdown:
+                agent_parts = [
+                    f"{name}: ${data.get('total_cost_usd', 0.0):.4f} ({data.get('total_tokens', 0)} tok)"
+                    for name, data in agent_breakdown.items()
+                ]
+                agents_msg = f"[FinOps Agents] " + " | ".join(agent_parts)
+                print(agents_msg, flush=True)
+                logger.info(agents_msg)

@@ -15,13 +15,14 @@
 """adk-finops: Universal LLM FinOps and Token Cost Tracking for Google ADK and Python agents."""
 
 from .rate_card import ModelRate, RateCardRegistry
-from .tracker import CostTracker
+from .tracker import BudgetExceededError, CostTracker
 
 try:
     from .plugin import FinOpsCostPlugin
 
     __all__ = [
         "CostTracker",
+        "BudgetExceededError",
         "FinOpsCostPlugin",
         "RateCardRegistry",
         "ModelRate",
@@ -30,6 +31,7 @@ except ImportError:
     # Allows CostTracker and RateCardRegistry to be used without google-adk installed
     __all__ = [
         "CostTracker",
+        "BudgetExceededError",
         "RateCardRegistry",
         "ModelRate",
     ]
