@@ -513,7 +513,6 @@ Per Google Cloud pricing rules:
 
 `adk-finops` is designed to be used in **any Python application** — FastAPI/Flask backends, Celery/Ray background pipelines, LangChain/LlamaIndex workflows, or raw Google GenAI SDK scripts — without requiring Google ADK.
 
-> 📁 **Ready-to-run examples:** See the [`examples/standalone/`](examples/standalone/) folder or the [`standalone_finops_demo/`](../standalone_finops_demo/) workspace.
 
 ```python
 from adk_finops import CostTracker, BigQueryExporter
