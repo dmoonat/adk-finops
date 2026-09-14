@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Typing: Typed](https://img.shields.io/badge/typing-typed-green.svg)](src/adk_finops/py.typed)
 
-**Universal FinOps cost, token usage, and grounding fee tracking for the Google Agent Development Kit (ADK) and Python AI agents.**
+**Universal FinOps cost, token usage, and grounding fee tracking for the Google Agent Development Kit (ADK) and LLM workflows.**
 
 ---
 
