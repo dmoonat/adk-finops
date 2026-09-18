@@ -14,7 +14,13 @@
 
 """adk-finops: Universal LLM FinOps and Token Cost Tracking for Google ADK and Python agents."""
 
-from .display import format_summary_box, print_summary
+from .display import (
+    format_plain_task_efficiency,
+    format_summary_box,
+    print_summary,
+    print_task_efficiency_summary,
+    render_task_efficiency_table,
+)
 from .rate_card import ModelRate, RateCardRegistry
 from .tracker import BudgetExceededError, CostTracker
 
@@ -29,6 +35,8 @@ try:
         "ModelRate",
         "print_summary",
         "format_summary_box",
+        "print_task_efficiency_summary",
+        "render_task_efficiency_table",
     ]
 except ImportError:
     # Allows CostTracker and RateCardRegistry to be used without google-adk installed
@@ -39,6 +47,8 @@ except ImportError:
         "ModelRate",
         "print_summary",
         "format_summary_box",
+        "print_task_efficiency_summary",
+        "render_task_efficiency_table",
     ]
 
 try:

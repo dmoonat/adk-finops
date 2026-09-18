@@ -207,6 +207,6 @@ async def test_plugin_bigquery_integration():
 
         assert mock_exporter.export_summary.called
         call_kwargs = mock_exporter.export_summary.call_args[1]
-        assert call_kwargs["scope"] == "both"
-        assert call_kwargs["tags"] == {"env": "staging"}
+        assert call_kwargs["tags"]["env"] == "staging"
+        assert call_kwargs["tags"]["status"] == "success"
         assert call_kwargs["blocking"] is False

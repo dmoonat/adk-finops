@@ -61,6 +61,7 @@ class CostTracker:
     _enabled: ClassVar[bool] = True
     _budgets: ClassVar[dict[str, dict[str, float]]] = {}
     _global_budget: ClassVar[dict[str, float]] = {}
+    _task_history: ClassVar[list[dict[str, Any]]] = []
 
     @classmethod
     def get_registry(cls) -> RateCardRegistry:
@@ -119,6 +120,7 @@ class CostTracker:
             cls._active_runs.clear()
             cls._budgets.clear()
             cls._global_budget.clear()
+            cls._task_history.clear()
 
     @classmethod
     def reset_budgets(cls) -> None:
@@ -319,6 +321,9 @@ class CostTracker:
     def _create_empty_run(cls, run_id: str) -> dict[str, Any]:
         return {
             "run_id": run_id,
+            "status": "pending",
+            "is_failure": False,
+            "error": None,
             "total_calls": 0,
             "total_tool_calls": 0,
             "prompt_tokens": 0,
@@ -643,6 +648,118 @@ class CostTracker:
         return total_tool_fee
 
     @classmethod
+    def record_task_status(
+        cls,
+        session_id: str,
+        run_id: str | None = None,
+        status: str = "success",
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        """Records the outcome of a task (success or failure) and logs its efficiency metrics.
+
+        Args:
+            session_id: The session ID for the task.
+            run_id: Optional turn or invocation ID.
+            status: 'success', 'failed', 'error', 'aborted', or 'budget_exceeded'.
+            error: Optional error message or failure reason.
+        """
+        clean_status = status.lower().strip()
+        is_failure = clean_status in ("failed", "failure", "error", "aborted", "budget_exceeded")
+        target_ids = [session_id]
+        if run_id and run_id != session_id:
+            target_ids.append(run_id)
+
+        with cls._lock:
+            record_info: dict[str, Any] = {}
+            for tid in target_ids:
+                if tid in cls._active_runs:
+                    run = cls._active_runs[tid]
+                    run["status"] = clean_status
+                    run["is_failure"] = is_failure
+                    run["error"] = error
+                    record_info = {
+                        "session_id": session_id,
+                        "run_id": run_id,
+                        "status": clean_status,
+                        "is_failure": is_failure,
+                        "error": error,
+                        "total_tokens": run.get("total_tokens", 0),
+                        "total_cost_usd": run.get("total_cost_usd", 0.0),
+                        "llm_calls": run.get("total_calls", 0),
+                        "tool_calls": run.get("total_tool_calls", 0),
+                        "agent_breakdown": copy.deepcopy(run.get("breakdown_by_agent", {})),
+                    }
+
+            # If not in active runs, check if already in task history to update
+            if not record_info:
+                for item in cls._task_history:
+                    if item.get("session_id") == session_id:
+                        item["status"] = clean_status
+                        item["is_failure"] = is_failure
+                        item["error"] = error
+                        record_info = item
+                        break
+
+            if record_info:
+                existing = next((item for item in cls._task_history if item.get("session_id") == session_id), None)
+                if existing and existing is not record_info:
+                    existing.update(record_info)
+                elif not existing:
+                    cls._task_history.append(record_info)
+
+            return record_info
+
+
+    @classmethod
+    def get_task_efficiency_metrics(cls) -> dict[str, Any]:
+        """Computes comparative metrics between successful tasks and failed/wasted agent loops."""
+        with cls._lock:
+            history = list(cls._task_history)
+
+        successes = [t for t in history if not t.get("is_failure", False)]
+        failures = [t for t in history if t.get("is_failure", False)]
+
+        success_count = len(successes)
+        failed_count = len(failures)
+        total_tasks = success_count + failed_count
+
+        success_spend = sum(t.get("total_cost_usd", 0.0) for t in successes)
+        wasted_spend = sum(t.get("total_cost_usd", 0.0) for t in failures)
+        total_spend = success_spend + wasted_spend
+
+        success_tokens = sum(t.get("total_tokens", 0) for t in successes)
+        wasted_tokens = sum(t.get("total_tokens", 0) for t in failures)
+        total_tokens = success_tokens + wasted_tokens
+
+        avg_success_spend = (success_spend / success_count) if success_count > 0 else 0.0
+        avg_wasted_spend = (wasted_spend / failed_count) if failed_count > 0 else 0.0
+
+        wasted_pct = round((wasted_spend / total_spend * 100), 1) if total_spend > 0 else 0.0
+
+        budget_limit = cls._global_budget.get("session")
+        budget_util_pct = round((total_spend / budget_limit * 100), 2) if budget_limit and budget_limit > 0 else None
+        wasted_of_budget_limit_pct = round((wasted_spend / budget_limit * 100), 2) if budget_limit and budget_limit > 0 else None
+
+        return {
+            "total_tasks": total_tasks,
+            "successful_tasks": success_count,
+            "failed_tasks": failed_count,
+            "total_spend_usd": round(total_spend, 6),
+            "successful_spend_usd": round(success_spend, 6),
+            "wasted_spend_usd": round(wasted_spend, 6),
+            "avg_successful_spend_usd": round(avg_success_spend, 6),
+            "avg_wasted_spend_usd": round(avg_wasted_spend, 6),
+            "wasted_spend_pct": wasted_pct,
+            "budget_limit_usd": budget_limit,
+            "budget_utilization_pct": budget_util_pct,
+            "wasted_of_budget_limit_pct": wasted_of_budget_limit_pct,
+            "total_tokens": total_tokens,
+            "successful_tokens": success_tokens,
+            "wasted_tokens": wasted_tokens,
+            "history": history,
+        }
+
+    @classmethod
     def get_summary(
         cls,
         run_id: str | None = None,
@@ -695,6 +812,9 @@ class CostTracker:
         result = dict(session_dict)
         result["turn"] = turn_dict
         result["session"] = session_dict
+        result["status"] = session_dict.get("status", "pending")
+        result["is_failure"] = session_dict.get("is_failure", False)
+        result["error"] = session_dict.get("error")
 
         # Evaluate budget status
         _, _, budget_status = cls.check_budget(run_id=effective_turn, session_id=effective_session)

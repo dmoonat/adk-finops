@@ -18,6 +18,7 @@
 - [Quickstart with Google ADK](#quickstart-with-google-adk)
 - [Dual-Scope Telemetry: Turn vs. Session](#dual-scope-telemetry-turn-vs-session)
 - [Budget Guards & Circuit Breakers](#budget-guards--circuit-breakers)
+- [Task Outcome & Wasted Spend Analytics (Success vs. Failure)](#task-outcome--wasted-spend-analytics-success-vs-failure)
 - [Context Caching Savings Analytics (ROI Tracker)](#context-caching-savings-analytics-roi-tracker)
 - [Multi-Agent Cost Attribution & Delegation Tracking](#multi-agent-cost-attribution--delegation-tracking)
 - [Rich Terminal Summary Box](#rich-terminal-summary-box)
@@ -60,6 +61,7 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 - **Native Google ADK Integration**: Intercepts model and tool invocations via the ADK `BasePlugin` lifecycle (`before_run`, `after_model`, `on_event`, `after_tool`, `after_run`).
 - **Dual-Scope Accounting**: Simultaneously tracks metrics for both the **active turn** (all calls within a user message) and the **cumulative session** (entire conversation history).
 - **Budget Guards & Circuit Breakers**: Set hard session and turn USD spending limits. Prevent runaway bills by halting execution, emitting warnings, or automatically downgrading expensive models (e.g. Gemini 2.5 Pro → Flash) when limits are breached.
+- **Task Outcome & Wasted Spend Analytics**: Distinguishes productive spend (`status="success"`) from wasted capital burned on failed retry loops or runtime exceptions (`status="failed"`, `"error"`). Computes average spend per successful task vs. average wasted spend per failed loop, capital loss percentage, and auto-exports crashed sessions to BigQuery.
 - **Context Caching Savings ROI**: Demonstrates financial value by tracking gross cost (cost without caching) vs. actual net cost, reporting exact dollars and percentage saved (e.g. up to 90% savings via Gemini Context Caching).
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
 - **Enterprise Volume Discounts**: Configure global or provider-specific discount multipliers (e.g., 15% Google Cloud negotiated discount).
@@ -223,6 +225,77 @@ finops_plugin = FinOpsCostPlugin(
 | **`"halt"`** *(default)* | Halts execution immediately, raises `BudgetExceededError` or returns a safe warning message in ADK to block further model calls. | Production safeguards, preventing runaway costs. |
 | **`"downgrade"`** | Automatically downgrades the agent's model to `fallback_model` (e.g. Gemini 2.5 Pro → Flash) once the budget threshold is reached. | Graceful service degradation with zero user downtime. |
 | **`"warn"`** | Logs a warning and marks `exceeded: True` in session state (`finops_cost.budget`) without interrupting the user. | Soft monitoring and alerting. |
+
+---
+
+## Task Outcome & Wasted Spend Analytics (Success vs. Failure)
+
+In production AI systems, a failed agent loop (e.g., an agent repeatedly failing schema validation across 3 retries, or crashing due to a downstream API outage after generating a complex plan) often burns **5x–20x more tokens** than a successful task while delivering **zero business value**.
+
+`adk-finops` tracks every LLM call in real time and classifies outcomes into **Productive Spend** vs. **Wasted Capital**, allowing teams to compare the average spend of a successful task against the wasted spend of failed loops.
+
+### Understanding `status` vs. `is_failure`
+
+| Field | Type | Values | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`status`** | `str` | `"success"`, `"pending"`, `"failed"`, `"error"`, `"aborted"`, `"budget_exceeded"` | **Operational Root Cause**: Identifies *how* the task ended (e.g., validation loop exhausted `"failed"`, downstream tool crash `"error"`, or circuit breaker halt `"budget_exceeded"`). |
+| **`is_failure`** | `bool` | `True` or `False` | **Financial Bucket**: Binary flag (`True` when status is `failed`, `error`, `aborted`, or `budget_exceeded`) used to separate **Wasted Spend (`True`)** from **Productive Spend (`False`)**. |
+
+### 1. Automatic Workflow State Detection (Google ADK)
+
+If any ADK workflow node or critic sets `ctx.state["failed"] = True` and `ctx.state["error_reason"] = "..."`, `FinOpsCostPlugin` automatically detects the failure in `after_run_callback`, tags the root cause, and marks the run's cost as wasted spend:
+
+```python
+def strict_validator(node_input, ctx):
+    attempts = ctx.state.get("attempts", 0) + 1
+    ctx.state["attempts"] = attempts
+    if attempts >= 3:
+        ctx.state["failed"] = True
+        ctx.state["error_reason"] = "Exhausted 3 retry attempts without passing validation"
+        return Event(output="Aborted", actions=EventActions(route="abort"))
+```
+
+### 2. Explicit Recording & Crash Recovery (Auto-Export to BigQuery)
+
+When an unhandled exception crashes an agent run, ADK skips `after_run_callback`. Calling `finops_plugin.record_task_status()` inside your `except` block ensures the wasted tokens are logged and **automatically streamed to BigQuery**:
+
+```python
+from adk_finops import CostTracker, print_summary, print_task_efficiency_summary
+
+try:
+    async for event in runner.run_async(user_id="u1", session_id=session_id, new_message=msg):
+        ...
+except Exception as e:
+    # Logs error outcome AND automatically flushes the crashed session to BigQuery
+    finops_plugin.record_task_status(
+        session_id=session_id,
+        status="error",
+        error=f"{type(e).__name__}: {str(e)}",
+    )
+    print_summary(session_id=session_id)
+
+# Render comparative efficiency report across all tasks
+print_task_efficiency_summary()
+```
+
+### Comparative Task Efficiency Report
+
+```text
+╭───────────── 📊 FinOps Task Efficiency & Wasted Spend Analysis ──────────────╮
+│                                                                              │
+│  Metric         Successful Tasks   Failed Loops (Wasted)      Total / Impact │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│  Task Count                    2                       2 4 (50.0% fail rate) │
+│  Total Spend             $0.0021                 $0.0080 $0.0101 (79.6% was) │
+│  Avg Spend / Task        $0.0010                 $0.0040 Wasted is 3.9x avg  │
+│  Total Tokens                864                   3,383               4,247 │
+│                                                                              │
+│  ⚠️  Capital Loss: $0.0080 (79.6% of total spend) was burned on uncompleted  │
+│ or failed tasks.                                                             │
+│  🛡️  Budget Context: Total spend is $0.0101 / $5.0000 (0.2% limit used;      │
+│ waste is 0.16% of budget limit).                                             │
+╰─────────────── adk-finops • Successful vs. Wasted Agent Loops ───────────────╯
+```
 
 ---
 
@@ -783,6 +856,22 @@ WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
   AND agent_name IS NULL
 GROUP BY 1
 ORDER BY net_dollars_saved DESC;
+```
+
+#### 3. Successful vs. Wasted Spend & Failure Root-Cause Analysis
+```sql
+SELECT
+  COALESCE(JSON_VALUE(tags, '$.status'), 'success') AS task_outcome,
+  COALESCE(JSON_VALUE(tags, '$.is_failure'), 'false') AS is_wasted_spend,
+  COUNT(*) AS total_runs,
+  ROUND(SUM(total_cost_usd), 4) AS total_spend_usd,
+  ROUND(AVG(total_cost_usd), 4) AS avg_cost_per_task,
+  ROUND(AVG(total_tokens), 0) AS avg_tokens_per_task
+FROM `my-gcp-project.finops.agent_costs`
+WHERE scope = 'session'
+  AND agent_name IS NULL
+GROUP BY 1, 2
+ORDER BY total_spend_usd DESC;
 ```
 
 ---

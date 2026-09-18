@@ -79,6 +79,7 @@ class FinOpsCostPlugin(BasePlugin):
         self.bigquery_tags = bigquery_tags
         self.bigquery_auto_create_table = bigquery_auto_create_table
         self.bq_exporter = None
+        self._exported_sessions: set[str] = set()
 
         if self.bigquery_table:
             from .exporters.bigquery import BigQueryExporter
@@ -310,6 +311,31 @@ class FinOpsCostPlugin(BasePlugin):
         """Gathers cumulative FinOps summary and persists it into ADK session state."""
         turn_id, session_id = self._extract_ids(invocation_context)
 
+        # Auto-detect task status from session state if set by workflow nodes/critics
+        if hasattr(invocation_context, "session") and invocation_context.session:
+            sess_state = getattr(invocation_context.session, "state", {}) or {}
+            if sess_state.get("failed") or sess_state.get("is_failure"):
+                CostTracker.record_task_status(
+                    session_id=session_id,
+                    run_id=turn_id,
+                    status=sess_state.get("status", "failed"),
+                    error=sess_state.get("error_reason") or sess_state.get("error"),
+                )
+            elif sess_state.get("status"):
+                CostTracker.record_task_status(
+                    session_id=session_id,
+                    run_id=turn_id,
+                    status=sess_state.get("status"),
+                    error=sess_state.get("error_reason") or sess_state.get("error"),
+                )
+            else:
+                # If no status set yet, mark as success
+                CostTracker.record_task_status(
+                    session_id=session_id,
+                    run_id=turn_id,
+                    status="success",
+                )
+
         summary = CostTracker.get_summary(run_id=turn_id, session_id=session_id, pop=False)
         if summary:
             if hasattr(invocation_context, "session") and invocation_context.session:
@@ -364,14 +390,108 @@ class FinOpsCostPlugin(BasePlugin):
                 print_summary(summary)
 
             if self.bq_exporter:
+                tags = dict(self.bigquery_tags or {})
+                task_status = sess_info.get("status") or summary.get("status")
+                is_fail = sess_info.get("is_failure") if sess_info.get("is_failure") is not None else summary.get("is_failure")
+                if task_status:
+                    tags["status"] = task_status
+                if is_fail is not None:
+                    tags["is_failure"] = is_fail
+                if sess_info.get("error"):
+                    tags["error"] = sess_info.get("error")
+
                 self.bq_exporter.export_summary(
                     summary=summary,
                     scope=self.bigquery_export_scope,
-                    tags=self.bigquery_tags,
+                    tags=tags if tags else None,
                     blocking=False,
                 )
+                self._exported_sessions.add(session_id)
+
+    def export_session(
+        self,
+        session_id: str,
+        run_id: str | None = None,
+        status: str | None = None,
+        error: str | None = None,
+        tags: dict[str, Any] | None = None,
+        blocking: bool = False,
+    ) -> None:
+        """Exports a session's FinOps summary to BigQuery.
+
+        Useful when an unhandled exception or workflow error prevented
+        after_run_callback from executing automatically.
+        """
+        if status:
+            CostTracker.record_task_status(session_id=session_id, run_id=run_id, status=status, error=error)
+
+        summary = CostTracker.get_summary(run_id=run_id, session_id=session_id, pop=False)
+        if not summary or not self.bq_exporter:
+            return
+
+        export_tags = dict(self.bigquery_tags or {})
+        if tags:
+            export_tags.update(tags)
+
+        sess_info = summary.get("session", {})
+        task_status = status or sess_info.get("status") or summary.get("status")
+        is_fail = sess_info.get("is_failure") if sess_info.get("is_failure") is not None else summary.get("is_failure")
+        if task_status:
+            export_tags["status"] = task_status
+        if is_fail is not None:
+            export_tags["is_failure"] = is_fail
+        if error or sess_info.get("error"):
+            export_tags["error"] = error or sess_info.get("error")
+
+        self.bq_exporter.export_summary(
+            summary=summary,
+            scope=self.bigquery_export_scope,
+            tags=export_tags if export_tags else None,
+            blocking=blocking,
+        )
+        self._exported_sessions.add(session_id)
+
+    def record_task_status(
+        self,
+        session_id: str,
+        run_id: str | None = None,
+        status: str = "success",
+        error: str | None = None,
+        export_to_bigquery: bool = True,
+    ) -> dict[str, Any]:
+        """Records task outcome (success vs failure) and updates efficiency metrics.
+
+        If export_to_bigquery is True and the session was not already exported (e.g. because
+        an exception prevented after_run_callback from executing), it automatically exports
+        the final record to BigQuery.
+
+        Args:
+            session_id: The session ID for the task.
+            run_id: Optional turn or invocation ID.
+            status: 'success', 'failed', 'error', 'aborted', or 'budget_exceeded'.
+            error: Optional error message or failure reason.
+            export_to_bigquery: Whether to stream to BigQuery if not yet exported.
+        """
+        res = CostTracker.record_task_status(
+            session_id=session_id,
+            run_id=run_id,
+            status=status,
+            error=error,
+        )
+
+        if export_to_bigquery and self.bq_exporter and session_id not in self._exported_sessions:
+            self.export_session(
+                session_id=session_id,
+                run_id=run_id,
+                status=status,
+                error=error,
+                blocking=False,
+            )
+
+        return res
 
     def close(self) -> None:
         """Flushes and shuts down exporter background workers."""
         if self.bq_exporter:
             self.bq_exporter.close()
+
