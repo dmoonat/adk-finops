@@ -51,6 +51,22 @@ except ImportError:
         "render_task_efficiency_table",
     ]
 
+from .exporters import (
+    BaseExporter,
+    CSVExporter,
+    JSONLExporter,
+    OpenTelemetryExporter,
+)
+
+__all__.extend(
+    [
+        "BaseExporter",
+        "CSVExporter",
+        "JSONLExporter",
+        "OpenTelemetryExporter",
+    ]
+)
+
 try:
     from .exporters import BigQueryExporter
 

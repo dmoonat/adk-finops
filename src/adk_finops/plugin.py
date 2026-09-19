@@ -65,8 +65,22 @@ class FinOpsCostPlugin(BasePlugin):
         bigquery_export_scope: str = "session",  # "session", "turn", or "both"
         bigquery_tags: dict[str, Any] | None = None,
         bigquery_auto_create_table: bool = True,
+        jsonl_path: str | Path | None = None,
+        csv_path: str | Path | None = None,
+        enable_otel: bool = False,
+        otlp_endpoint: str | None = None,
+        exporters: list[Any] | None = None,
+        export_scope: str | None = None,
+        export_tags: dict[str, Any] | None = None,
     ):
         super().__init__(name=name)
+        try:
+            import certifi
+
+            os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+            os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+        except ImportError:
+            pass
         self.default_model = default_model
         self.budget_limit_usd = budget_limit_usd
         self.turn_budget_limit_usd = turn_budget_limit_usd
@@ -75,10 +89,14 @@ class FinOpsCostPlugin(BasePlugin):
         self.fallback_model = fallback_model
         self.render_terminal_box = render_terminal_box
         self.bigquery_table = bigquery_table or os.getenv("ADK_FINOPS_BIGQUERY_TABLE")
-        self.bigquery_export_scope = bigquery_export_scope.lower()
-        self.bigquery_tags = bigquery_tags
+        self.export_scope = (export_scope or bigquery_export_scope).lower()
+        self.export_tags = export_tags if export_tags is not None else bigquery_tags
+        # Backward-compatible attribute aliases
+        self.bigquery_export_scope = self.export_scope
+        self.bigquery_tags = self.export_tags
         self.bigquery_auto_create_table = bigquery_auto_create_table
         self.bq_exporter = None
+        self.exporters: list[Any] = list(exporters) if exporters else []
         self._exported_sessions: set[str] = set()
 
         if self.bigquery_table:
@@ -88,6 +106,26 @@ class FinOpsCostPlugin(BasePlugin):
                 table_id=self.bigquery_table,
                 auto_create_table=self.bigquery_auto_create_table,
             )
+            self.exporters.append(self.bq_exporter)
+
+        resolved_jsonl = jsonl_path or os.getenv("ADK_FINOPS_JSONL_PATH")
+        if resolved_jsonl:
+            from .exporters.local import JSONLExporter
+
+            self.exporters.append(JSONLExporter(file_path=resolved_jsonl))
+
+        resolved_csv = csv_path or os.getenv("ADK_FINOPS_CSV_PATH")
+        if resolved_csv:
+            from .exporters.local import CSVExporter
+
+            self.exporters.append(CSVExporter(file_path=resolved_csv))
+
+        env_otel = os.getenv("ADK_FINOPS_ENABLE_OTEL", "").strip().lower() in ("1", "true", "yes")
+        resolved_otlp = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or os.getenv("PHOENIX_COLLECTOR_ENDPOINT")
+        if enable_otel or env_otel or resolved_otlp:
+            from .exporters.otel import OpenTelemetryExporter
+
+            self.exporters.append(OpenTelemetryExporter(otlp_endpoint=otlp_endpoint))
 
         # Configure budgets in CostTracker if specified
         if budget_limit_usd is not None or turn_budget_limit_usd is not None or agent_budgets is not None:
@@ -142,6 +180,10 @@ class FinOpsCostPlugin(BasePlugin):
         self, *, invocation_context: InvocationContext
     ) -> types.Content | None:
         """Initializes a FinOps tracking run and evaluates budget guardrails."""
+        for exporter in self.exporters:
+            if hasattr(exporter, "ensure_provider_ready"):
+                exporter.ensure_provider_ready()
+
         turn_id, session_id = self._extract_ids(invocation_context)
         CostTracker.start_turn(turn_id=turn_id, session_id=session_id)
         msg = f"[FinOps] Initialized cost tracking: turn={turn_id[:8]} session={session_id[:8]}"
@@ -205,6 +247,22 @@ class FinOpsCostPlugin(BasePlugin):
             savings_str = ""
             if record.get("savings_usd", 0.0) > 0:
                 savings_str = f" | 💰 Saved ${record['savings_usd']:.6f} ({record['savings_pct']}%) via Context Caching"
+
+            # Enrich ADK's active OpenTelemetry span (e.g. when running with --trace_to_cloud)
+            try:
+                from opentelemetry import trace
+
+                current_span = trace.get_current_span()
+                if current_span and current_span.is_recording():
+                    current_span.set_attribute("gen_ai.finops.agent_name", agent_name)
+                    current_span.set_attribute("gen_ai.finops.model", model_name)
+                    current_span.set_attribute("gen_ai.finops.cost_usd", float(record.get("cost_usd", 0.0)))
+                    current_span.set_attribute("gen_ai.finops.savings_usd", float(record.get("savings_usd", 0.0)))
+                    current_span.set_attribute("gen_ai.finops.savings_pct", float(record.get("savings_pct", 0.0)))
+                    current_span.set_attribute("gen_ai.usage.thoughts_tokens", int(thoughts_tokens))
+                    current_span.set_attribute("gen_ai.usage.cached_tokens", int(cached_tokens))
+            except Exception:
+                pass
 
             msg = (
                 f"[FinOps LLM] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} model={model_name} "
@@ -299,6 +357,15 @@ class FinOpsCostPlugin(BasePlugin):
                 task_name=tool_name,
                 agent_name=agent_name,
             )
+            try:
+                from opentelemetry import trace
+
+                current_span = trace.get_current_span()
+                if current_span and current_span.is_recording():
+                    current_span.set_attribute("gen_ai.finops.tool_name", tool_name)
+                    current_span.set_attribute("gen_ai.finops.tool_fee_usd", float(cost))
+            except Exception:
+                pass
             msg = f"[FinOps Grounding] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}"
             print(msg, flush=True)
             logger.info(msg)
@@ -389,8 +456,8 @@ class FinOpsCostPlugin(BasePlugin):
 
                 print_summary(summary)
 
-            if self.bq_exporter:
-                tags = dict(self.bigquery_tags or {})
+            if self.exporters:
+                tags = dict(self.export_tags or {})
                 task_status = sess_info.get("status") or summary.get("status")
                 is_fail = sess_info.get("is_failure") if sess_info.get("is_failure") is not None else summary.get("is_failure")
                 if task_status:
@@ -400,12 +467,13 @@ class FinOpsCostPlugin(BasePlugin):
                 if sess_info.get("error"):
                     tags["error"] = sess_info.get("error")
 
-                self.bq_exporter.export_summary(
-                    summary=summary,
-                    scope=self.bigquery_export_scope,
-                    tags=tags if tags else None,
-                    blocking=False,
-                )
+                for exporter in self.exporters:
+                    exporter.export_summary(
+                        summary=summary,
+                        scope=self.export_scope,
+                        tags=tags if tags else None,
+                        blocking=False,
+                    )
                 self._exported_sessions.add(session_id)
 
     def export_session(
@@ -417,7 +485,7 @@ class FinOpsCostPlugin(BasePlugin):
         tags: dict[str, Any] | None = None,
         blocking: bool = False,
     ) -> None:
-        """Exports a session's FinOps summary to BigQuery.
+        """Exports a session's FinOps summary to all configured exporters (BigQuery, JSONL, CSV, OTEL).
 
         Useful when an unhandled exception or workflow error prevented
         after_run_callback from executing automatically.
@@ -426,10 +494,10 @@ class FinOpsCostPlugin(BasePlugin):
             CostTracker.record_task_status(session_id=session_id, run_id=run_id, status=status, error=error)
 
         summary = CostTracker.get_summary(run_id=run_id, session_id=session_id, pop=False)
-        if not summary or not self.bq_exporter:
+        if not summary or not self.exporters:
             return
 
-        export_tags = dict(self.bigquery_tags or {})
+        export_tags = dict(self.export_tags or {})
         if tags:
             export_tags.update(tags)
 
@@ -443,12 +511,13 @@ class FinOpsCostPlugin(BasePlugin):
         if error or sess_info.get("error"):
             export_tags["error"] = error or sess_info.get("error")
 
-        self.bq_exporter.export_summary(
-            summary=summary,
-            scope=self.bigquery_export_scope,
-            tags=export_tags if export_tags else None,
-            blocking=blocking,
-        )
+        for exporter in self.exporters:
+            exporter.export_summary(
+                summary=summary,
+                scope=self.export_scope,
+                tags=export_tags if export_tags else None,
+                blocking=blocking,
+            )
         self._exported_sessions.add(session_id)
 
     def record_task_status(
@@ -457,20 +526,22 @@ class FinOpsCostPlugin(BasePlugin):
         run_id: str | None = None,
         status: str = "success",
         error: str | None = None,
-        export_to_bigquery: bool = True,
+        auto_export: bool = True,
+        export_to_bigquery: bool | None = None,
     ) -> dict[str, Any]:
         """Records task outcome (success vs failure) and updates efficiency metrics.
 
-        If export_to_bigquery is True and the session was not already exported (e.g. because
-        an exception prevented after_run_callback from executing), it automatically exports
-        the final record to BigQuery.
+        If `auto_export` is True and the session was not already exported (e.g. because
+        an exception prevented `after_run_callback` from executing), it automatically exports
+        the final record to all configured exporters (BigQuery, JSONL, CSV, OpenTelemetry).
 
         Args:
             session_id: The session ID for the task.
             run_id: Optional turn or invocation ID.
             status: 'success', 'failed', 'error', 'aborted', or 'budget_exceeded'.
             error: Optional error message or failure reason.
-            export_to_bigquery: Whether to stream to BigQuery if not yet exported.
+            auto_export: Whether to automatically export to all configured exporters if not yet exported.
+            export_to_bigquery: Deprecated alias for `auto_export` kept for backward compatibility.
         """
         res = CostTracker.record_task_status(
             session_id=session_id,
@@ -479,7 +550,8 @@ class FinOpsCostPlugin(BasePlugin):
             error=error,
         )
 
-        if export_to_bigquery and self.bq_exporter and session_id not in self._exported_sessions:
+        should_export = export_to_bigquery if export_to_bigquery is not None else auto_export
+        if should_export and self.exporters and session_id not in self._exported_sessions:
             self.export_session(
                 session_id=session_id,
                 run_id=run_id,
@@ -492,6 +564,7 @@ class FinOpsCostPlugin(BasePlugin):
 
     def close(self) -> None:
         """Flushes and shuts down exporter background workers."""
-        if self.bq_exporter:
-            self.bq_exporter.close()
+        for exporter in self.exporters:
+            if hasattr(exporter, "close"):
+                exporter.close()
 

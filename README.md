@@ -790,18 +790,67 @@ Because both aggregate rows and attributed breakdown rows coexist in the same ta
 
 ---
 
-### Standalone Exporter Usage
+### Cloud-Agnostic & Local Exporters (`JSONL`, `CSV`, `OpenTelemetry`)
 
-You can also use `BigQueryExporter` directly in any Python script, background pipeline, or custom framework:
+You don't need a cloud warehouse to persist FinOps telemetry. `adk-finops` includes built-in local file exporters (`JSONLExporter`, `CSVExporter`) and an `OpenTelemetryExporter` that work completely offline or with any observability backend (DuckDB, Pandas, Jaeger, Datadog, Arize Phoenix, Honeycomb).
+
+#### 1. Configure Local & OTEL Exporters on `FinOpsCostPlugin`
+
+```python
+from adk_finops import FinOpsCostPlugin
+
+finops_plugin = FinOpsCostPlugin(
+    jsonl_path="logs/finops_costs.jsonl",   # or set ADK_FINOPS_JSONL_PATH
+    csv_path="logs/finops_costs.csv",       # or set ADK_FINOPS_CSV_PATH
+    enable_otel=True,                       # or set ADK_FINOPS_ENABLE_OTEL=true
+    export_scope="session",                 # "session", "turn", or "both"
+    export_tags={"env": "local_dev"},
+)
+```
+
+Each exported row in `.jsonl` and `.csv` automatically includes first-class task outcome columns (`status`, `is_failure`, `error`) alongside token counts, USD costs, context caching savings, and agent/model breakdowns.
+
+#### 2. Query Local `.jsonl` / `.csv` Logs Instantly with DuckDB or Pandas
+
+```sql
+-- Query local JSONL file directly using DuckDB CLI
+SELECT
+  status AS task_outcome,
+  is_failure AS is_wasted_spend,
+  COUNT(*) AS total_runs,
+  ROUND(SUM(total_cost_usd), 4) AS total_spend_usd
+FROM read_json_auto('logs/finops_costs.jsonl')
+WHERE scope = 'session' AND agent_name IS NULL
+GROUP BY 1, 2;
+```
+
+#### 3. OpenTelemetry Semantic Conventions (`OpenTelemetryExporter`)
+
+When `enable_otel=True` (or `OpenTelemetryExporter` is used), `adk-finops` enriches the active span and emits `gen_ai.finops.<scope>` spans with standard attributes:
+- `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.thoughts_tokens`, `gen_ai.usage.cached_tokens`, `gen_ai.usage.total_tokens`
+- `gen_ai.usage.cost_usd`, `gen_ai.usage.llm_cost_usd`, `gen_ai.usage.tool_cost_usd`, `gen_ai.usage.savings_usd`
+- `gen_ai.finops.task_outcome` (`success`, `failed`, `error`, `budget_exceeded`)
+- `gen_ai.finops.is_wasted_spend` (`true` / `false`)
+
+#### 4. Standalone Exporter Usage (`BigQueryExporter`, `JSONLExporter`, `CSVExporter`, `OpenTelemetryExporter`)
+
+You can also use any exporter directly in standalone Python scripts or custom agent frameworks:
 
 ```python
 from adk_finops import CostTracker
-from adk_finops.exporters import BigQueryExporter
-
-exporter = BigQueryExporter(
-    table_id="my-gcp-project.finops.agent_costs",
-    auto_create_table=True,
+from adk_finops.exporters import (
+    BigQueryExporter,
+    CSVExporter,
+    JSONLExporter,
+    OpenTelemetryExporter,
 )
+
+exporters = [
+    JSONLExporter("finops_costs.jsonl"),
+    CSVExporter("finops_costs.csv"),
+    OpenTelemetryExporter(),
+    # BigQueryExporter(table_id="my-gcp-project.finops.agent_costs"),
+]
 
 with CostTracker.track_run("batch_job_42"):
     CostTracker.record_usage(
@@ -812,9 +861,11 @@ with CostTracker.track_run("batch_job_42"):
         cached_tokens=12000,
         agent_name="data_extractor",
     )
+    CostTracker.record_task_status(session_id="batch_job_42", status="success")
 
 summary = CostTracker.get_summary("batch_job_42")
-exporter.export_summary(summary, scope="session", tags={"env": "prod", "pipeline": "etl"})
+for exporter in exporters:
+    exporter.export_summary(summary, scope="session", tags={"env": "prod", "pipeline": "etl"})
 ```
 
 ---
