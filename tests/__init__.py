@@ -1,1 +1,1 @@
-# Copyright 2026 Google LLC
+# Copyright 2026
