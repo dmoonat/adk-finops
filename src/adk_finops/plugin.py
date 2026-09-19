@@ -69,6 +69,9 @@ class FinOpsCostPlugin(BasePlugin):
         csv_path: str | Path | None = None,
         enable_otel: bool = False,
         otlp_endpoint: str | None = None,
+        enable_dashboard: bool = False,
+        dashboard_port: int = 8088,
+        dashboard_endpoint: str | None = None,
         exporters: list[Any] | None = None,
         export_scope: str | None = None,
         export_tags: dict[str, Any] | None = None,
@@ -120,12 +123,36 @@ class FinOpsCostPlugin(BasePlugin):
 
             self.exporters.append(CSVExporter(file_path=resolved_csv))
 
+        resolved_http = dashboard_endpoint or os.getenv("ADK_FINOPS_DASHBOARD_ENDPOINT")
+        if resolved_http:
+            from .exporters.local import HTTPExporter
+
+            self.exporters.append(HTTPExporter(endpoint=resolved_http))
+
         env_otel = os.getenv("ADK_FINOPS_ENABLE_OTEL", "").strip().lower() in ("1", "true", "yes")
         resolved_otlp = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or os.getenv("PHOENIX_COLLECTOR_ENDPOINT")
         if enable_otel or env_otel or resolved_otlp:
             from .exporters.otel import OpenTelemetryExporter
 
             self.exporters.append(OpenTelemetryExporter(otlp_endpoint=otlp_endpoint))
+
+        env_dash = os.getenv("ADK_FINOPS_ENABLE_DASHBOARD", "").strip().lower() in ("1", "true", "yes")
+        self.dashboard_url: str | None = None
+        if enable_dashboard or env_dash:
+            from .dashboard import start_background_dashboard
+
+            local_path = resolved_jsonl or resolved_csv
+            if local_path:
+                log_dir: str | Path | None = (
+                    Path(local_path).parent if Path(local_path).suffix else local_path
+                )
+            else:
+                log_dir = None
+            self.dashboard_url = start_background_dashboard(
+                port=dashboard_port,
+                log_dir=log_dir,
+                bigquery_table=self.bigquery_table,
+            )
 
         # Configure budgets in CostTracker if specified
         if budget_limit_usd is not None or turn_budget_limit_usd is not None or agent_budgets is not None:

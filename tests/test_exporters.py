@@ -154,3 +154,19 @@ def test_plugin_multi_exporter_dispatch(tmp_path: Path):
 
     jsonl_rows = [json.loads(line) for line in jsonl_exp.file_path.read_text().splitlines()]
     assert any(r["session_id"] == "sess_plugin_multi" and r["status"] == "failed" for r in jsonl_rows)
+
+
+def test_dashboard_collect_telemetry_rows(tmp_path: Path):
+    from adk_finops.dashboard import collect_telemetry_rows
+
+    CostTracker.reset()
+    jsonl_file = tmp_path / "logs" / "finops_costs.jsonl"
+    exporter = JSONLExporter(file_path=jsonl_file)
+
+    summary = _setup_sample_session("sess_dash_01", status="success")
+    exporter.export_summary(summary, scope="session")
+
+    payload = collect_telemetry_rows(log_dir=tmp_path / "logs", include_bigquery=False)
+    assert "local_jsonl" in payload["sources"]
+    assert len(payload["rows"]) >= 2
+    assert any(r["session_id"] == "sess_dash_01" and r["status"] == "success" for r in payload["rows"])

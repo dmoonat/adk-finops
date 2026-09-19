@@ -8,6 +8,8 @@
 
 **Universal FinOps cost, token usage, and grounding fee tracking for the Google Agent Development Kit (ADK) and LLM workflows.**
 
+![adk-finops Near-Live FinOps Web Dashboard](img/dashboard.png)
+
 ---
 
 ## Table of Contents
@@ -35,7 +37,8 @@
 - [Standalone Usage (Without ADK)](#standalone-usage-without-adk)
 - [Configuration Reference](#configuration-reference)
 - [Built-In Model Rate Cards](#built-in-model-rate-cards)
-- [One-Line BigQuery Exporter](#one-line-bigquery-exporter)
+- [Flexible Exporters (Local, Cloud & OpenTelemetry)](#one-line-bigquery-exporter)
+  - [Near-Live FinOps Web Dashboard (`adk-finops dashboard`)](#near-live-finops-web-dashboard-adk-finops-dashboard)
   - [Zero-Boilerplate Schema Management](#zero-boilerplate-schema-management)
   - [Standalone Exporter Usage](#standalone-exporter-usage)
   - [Sample SQL Queries for Looker Studio](#sample-sql-queries-for-looker-studio)
@@ -787,6 +790,88 @@ Because both aggregate rows and attributed breakdown rows coexist in the same ta
   WHERE scope = 'session' AND model_name IS NOT NULL
   GROUP BY 1;
   ```
+
+---
+
+### Near-Live FinOps Web Dashboard (`adk-finops dashboard`)
+
+![Near-Live FinOps Web Dashboard](img/dashboard.png)
+
+`adk-finops` includes a built-in, zero-extra-dependency **FastAPI + Chart.js Near-Live Web Dashboard** that auto-refreshes every **2 seconds**, aggregating:
+1. **Live In-Memory `CostTracker` State:** Watch tokens and spend accumulate in real time while an agent is mid-execution.
+2. **Local Timestamped `.jsonl` & `.csv` Logs:** Automatically scans `logs/<YYYYMMDD_HHMMSS>/*.jsonl` and `*.csv`.
+3. **Remote HTTP Push (`POST /api/ingest`):** Receives telemetry pushed over HTTP from remote agent containers (`HTTPExporter` / `dashboard_endpoint`).
+4. **Optional BigQuery Live Sync:** Toggle the **Include BigQuery** switch in the UI (`15s` cache TTL) to merge cloud warehouse records (`ADK_FINOPS_BIGQUERY_TABLE`).
+
+**Interactive Dashboard Features:**
+- **4 Live Filters:** Filter by **Session ID**, **Agent Name**, **Model**, or **Task Outcome** (`✅ Effective Spend` vs `🔥 Wasted Spend`).
+- **5 Executive KPI Cards:** Total Spend ($), Effective Spend ($), Wasted Spend / Capital Loss ($ & %), Context Caching Savings ($), and Total Tokens (`In / Out / Think`).
+- **3 Interactive Charts:** Spend Efficiency & ROI Doughnut, Per-Agent Stacked Cost Bar (LLM vs Grounding), and Per-Model Token Composition.
+
+---
+
+#### Developer Mode: Embedded Background Server in `FinOpsCostPlugin`
+
+Start the live dashboard automatically in a background daemon thread inside your agent process:
+
+```python
+from adk_finops import FinOpsCostPlugin
+
+finops_plugin = FinOpsCostPlugin(
+    enable_dashboard=True,                  # or set ADK_FINOPS_ENABLE_DASHBOARD=true
+    dashboard_port=8088,                    # default: 8088 (auto-selects next free port if busy)
+    jsonl_path="logs/finops_costs.jsonl",   # saves into logs/<YYYYMMDD_HHMMSS>/finops_costs.jsonl
+)
+```
+
+---
+
+#### Enterprise & Org Admin Mode: Standalone Centralized Dashboard (`3 Patterns`)
+
+An organization admin can run `adk-finops dashboard` as a **single centralized FinOps control plane** (with zero agents running inside the dashboard process) to monitor dozens of independent agents across teams:
+
+##### Pattern A: Central Cloud Warehouse Mode (BigQuery Only)
+All agents across the org stream to a shared BigQuery table (`ADK_FINOPS_BIGQUERY_TABLE="org-project.finops.agent_costs"`). The admin runs the standalone dashboard pointing strictly to BigQuery:
+```bash
+adk-finops dashboard \
+  --bigquery-table org-project.finops.agent_costs \
+  --log-dir "" \
+  --host 0.0.0.0 \
+  --port 8088
+```
+
+##### Pattern B: Multi-Project Shared Directory / Volume Mode (`--log-dir`)
+Pass comma-separated directories to watch timestamped `.jsonl` / `.csv` files across multiple agent repositories or shared volumes simultaneously:
+```bash
+adk-finops dashboard \
+  --log-dir "/srv/agents/retail_bot/logs,/srv/agents/finance_bot/logs" \
+  --port 8088
+```
+
+##### Pattern C: Direct HTTP Push Mode (`dashboard_endpoint` $\rightarrow$ `POST /api/ingest`)
+When an organization does not use BigQuery and agents run in isolated containers/VMs without a shared disk:
+
+1. **Admin starts the central dashboard server:**
+   ```bash
+   adk-finops dashboard --host 0.0.0.0 --port 8088 --log-dir central_logs
+   ```
+2. **Each remote agent sets `dashboard_endpoint` (or `ADK_FINOPS_DASHBOARD_ENDPOINT`):**
+   ```python
+   from adk_finops import FinOpsCostPlugin
+
+   finops_plugin = FinOpsCostPlugin(
+       dashboard_endpoint="http://finops-dash.internal:8088",  # Pushes via HTTPExporter to POST /api/ingest
+       export_tags={"team": "payments", "service": "refund_agent"},
+   )
+   ```
+   The central dashboard receives the rows in real time **and** persists them to `central_logs/ingested_costs.jsonl` so telemetry survives server restarts.
+
+---
+
+#### How Hybrid Local + BigQuery Deduplication Works
+When **both** local logs (`jsonl_path` / `csv_path`) and `bigquery_table` are enabled, the dashboard deduplicates every record by `(session_id, scope, agent_name)`:
+- **Zero Double-Counting:** Active and local sessions load in `0ms` from memory/disk; if the same `session_id` also exists in BigQuery, the duplicate cloud row is ignored.
+- **Historical Backfill:** Older runs or teammate sessions that exist **only** in BigQuery are seamlessly merged into the dashboard when **Include BigQuery** is checked.
 
 ---
 

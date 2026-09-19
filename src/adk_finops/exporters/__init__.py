@@ -15,7 +15,7 @@
 """Telemetry exporters for adk-finops."""
 
 from .base import BaseExporter
-from .local import CSVExporter, JSONLExporter
+from .local import CSVExporter, HTTPExporter, JSONLExporter
 from .otel import OpenTelemetryExporter
 
 try:
@@ -25,6 +25,7 @@ try:
         "BaseExporter",
         "BigQueryExporter",
         "CSVExporter",
+        "HTTPExporter",
         "JSONLExporter",
         "OpenTelemetryExporter",
     ]
@@ -32,6 +33,7 @@ except ImportError:
     __all__ = [
         "BaseExporter",
         "CSVExporter",
+        "HTTPExporter",
         "JSONLExporter",
         "OpenTelemetryExporter",
     ]

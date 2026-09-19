@@ -191,3 +191,51 @@ class CSVExporter(BaseExporter):
             logger.warning(
                 f"[FinOps CSV] Failed to write telemetry to {self.file_path}: {e}"
             )
+
+
+class HTTPExporter(BaseExporter):
+    """Pushes FinOps telemetry over HTTP POST to a central `adk-finops dashboard` (`/api/ingest`) or webhook."""
+
+    def __init__(self, endpoint: str = "http://127.0.0.1:8088", timeout: float = 5.0):
+        clean = endpoint.rstrip("/")
+        if not clean.endswith("/api/ingest"):
+            clean = f"{clean}/api/ingest"
+        self.endpoint = clean
+        self.timeout = timeout
+
+    def export_summary(
+        self,
+        summary: dict[str, Any],
+        scope: str = "session",
+        tags: dict[str, Any] | None = None,
+        blocking: bool = False,
+    ) -> None:
+        """Serializes FinOps rows and POSTs them as JSON to `self.endpoint`."""
+        import urllib.request
+
+        rows = self._prepare_rows(
+            summary=summary,
+            scope=scope,
+            tags=tags,
+            include_status_fields=True,
+        )
+        if not rows:
+            return
+
+        payload = json.dumps({"rows": rows}).encode("utf-8")
+        req = urllib.request.Request(
+            self.endpoint,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                if 200 <= resp.status < 300:
+                    msg = f"[FinOps HTTP] Pushed {len(rows)} row(s) to central dashboard ({self.endpoint})"
+                    print(msg, flush=True)
+                    logger.info(msg)
+        except Exception as e:
+            logger.warning(
+                f"[FinOps HTTP] Failed to push telemetry to {self.endpoint}: {e}"
+            )

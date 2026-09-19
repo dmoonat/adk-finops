@@ -51,9 +51,11 @@ except ImportError:
         "render_task_efficiency_table",
     ]
 
+from .dashboard import create_dashboard_app, start_background_dashboard
 from .exporters import (
     BaseExporter,
     CSVExporter,
+    HTTPExporter,
     JSONLExporter,
     OpenTelemetryExporter,
 )
@@ -62,8 +64,11 @@ __all__.extend(
     [
         "BaseExporter",
         "CSVExporter",
+        "HTTPExporter",
         "JSONLExporter",
         "OpenTelemetryExporter",
+        "create_dashboard_app",
+        "start_background_dashboard",
     ]
 )
 

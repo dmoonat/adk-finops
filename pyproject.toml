@@ -59,6 +59,9 @@ dev = [
     "google-cloud-bigquery>=3.0.0"
 ]
 
+[project.scripts]
+adk-finops = "adk_finops.dashboard:cli_main"
+
 [project.urls]
 Homepage = "https://github.com/dmoonat/adk-finops"
 Repository = "https://github.com/dmoonat/adk-finops"
