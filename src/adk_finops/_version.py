@@ -1,4 +1,4 @@
-# Copyright 2026 Google LLC
+# Copyright 2026
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,4 +19,4 @@ try:
     __version__ = _get_version("adk-finops")
 except Exception:
     # Fallback when running from an uninstalled source tree
-    __version__ = "0.4.0"
+    __version__ = "0.5.0"
