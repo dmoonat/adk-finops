@@ -97,12 +97,35 @@ def _normalize_row(raw: dict[str, Any], source: str = "local") -> dict[str, Any]
     if isinstance(model_name, str) and not model_name.strip():
         model_name = None
 
+    root_agent_name = raw.get("root_agent_name") or tags_dict.get("root_agent_name")
+    if isinstance(root_agent_name, str) and not root_agent_name.strip():
+        root_agent_name = None
+
+    parent_agent_name = raw.get("parent_agent_name") or tags_dict.get("parent_agent_name")
+    if isinstance(parent_agent_name, str) and not parent_agent_name.strip():
+        parent_agent_name = None
+
+    breakdown_by_agent_raw = raw.get("breakdown_by_agent")
+    breakdown_by_agent: dict[str, Any] = {}
+    if isinstance(breakdown_by_agent_raw, dict):
+        breakdown_by_agent = breakdown_by_agent_raw
+    elif isinstance(breakdown_by_agent_raw, str) and breakdown_by_agent_raw.strip():
+        try:
+            parsed_bba = json.loads(breakdown_by_agent_raw)
+            if isinstance(parsed_bba, dict):
+                breakdown_by_agent = parsed_bba
+        except Exception:
+            breakdown_by_agent = {}
+
     return {
         "timestamp": str(raw.get("timestamp") or datetime.now(timezone.utc).isoformat()),
         "session_id": str(raw.get("session_id") or "default_session"),
         "turn_id": str(raw.get("turn_id") or ""),
         "scope": str(raw.get("scope") or "session").lower(),
         "agent_name": agent_name,
+        "root_agent_name": root_agent_name,
+        "parent_agent_name": parent_agent_name,
+        "agent_role": raw.get("agent_role"),
         "model_name": model_name,
         "status": status,
         "is_failure": is_failure,
@@ -122,8 +145,103 @@ def _normalize_row(raw: dict[str, Any], source: str = "local") -> dict[str, Any]
         "budget_limit_usd": _to_float(raw.get("budget_limit_usd")) if raw.get("budget_limit_usd") not in (None, "") else None,
         "budget_utilization_pct": _to_float(raw.get("budget_utilization_pct")) if raw.get("budget_utilization_pct") not in (None, "") else None,
         "budget_exceeded": str(raw.get("budget_exceeded", "")).lower() in ("true", "1") if isinstance(raw.get("budget_exceeded"), str) else bool(raw.get("budget_exceeded", False)),
+        "_breakdown_by_agent_keys": list(breakdown_by_agent.keys()) if breakdown_by_agent else [],
         "source": source,
     }
+
+
+def _enrich_hierarchy(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Infers and enriches Root (Parent) Agent -> Sub-Agent hierarchy across all session rows."""
+    by_session_scope: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for r in rows:
+        key = (r.get("session_id") or "default_session", r.get("scope") or "session")
+        by_session_scope.setdefault(key, []).append(r)
+
+    root_keywords = ("coordinator", "root", "orchestrator", "supervisor", "router", "manager", "lead", "main", "planner")
+    enriched: list[dict[str, Any]] = []
+
+    for (sess_id, scope), group in by_session_scope.items():
+        session_root: str | None = None
+        # 1. Explicit root_agent_name from any row in the group
+        for r in group:
+            if r.get("root_agent_name"):
+                session_root = r["root_agent_name"]
+                break
+        # 2. First key from breakdown_by_agent on the session aggregate row
+        if not session_root:
+            for r in group:
+                bba_keys = r.get("_breakdown_by_agent_keys") or []
+                if bba_keys:
+                    for k in bba_keys:
+                        if any(kw in k.lower() for kw in root_keywords):
+                            session_root = k
+                            break
+                    if not session_root:
+                        session_root = bba_keys[0]
+                    break
+        # 3. Heuristic match on agent names in the session
+        agent_names_in_group = [r["agent_name"] for r in group if r.get("agent_name")]
+        if not session_root and agent_names_in_group:
+            for a_name in agent_names_in_group:
+                if any(kw in a_name.lower() for kw in root_keywords):
+                    session_root = a_name
+                    break
+            if not session_root:
+                session_root = agent_names_in_group[0]
+        if not session_root:
+            session_root = "root_agent"
+
+        has_rollup = any(r.get("agent_name") is None for r in group)
+        for r in group:
+            r["root_agent_name"] = r.get("root_agent_name") or session_root
+            if r.get("agent_name") is None:
+                r["agent_role"] = "root_rollup"
+                r["parent_agent_name"] = None
+            elif r["agent_name"] == r["root_agent_name"]:
+                r["agent_role"] = "root_self"
+                r["parent_agent_name"] = None
+            else:
+                r["agent_role"] = "sub_agent"
+                r["parent_agent_name"] = r.get("parent_agent_name") or r["root_agent_name"]
+            r.pop("_breakdown_by_agent_keys", None)
+            enriched.append(r)
+
+        # Synthesize overall parent rollup row if only per-agent rows were present
+        if not has_rollup and group:
+            first = group[0]
+            synth = {
+                "timestamp": max(r.get("timestamp", "") for r in group),
+                "session_id": sess_id,
+                "turn_id": first.get("turn_id", ""),
+                "scope": scope,
+                "agent_name": None,
+                "root_agent_name": session_root,
+                "parent_agent_name": None,
+                "agent_role": "root_rollup",
+                "model_name": None,
+                "status": "failed" if any(r.get("is_failure") for r in group) else first.get("status", "success"),
+                "is_failure": any(r.get("is_failure") for r in group),
+                "error": next((r.get("error") for r in group if r.get("error")), None),
+                "prompt_tokens": sum(r.get("prompt_tokens", 0) for r in group),
+                "completion_tokens": sum(r.get("completion_tokens", 0) for r in group),
+                "thoughts_tokens": sum(r.get("thoughts_tokens", 0) for r in group),
+                "cached_tokens": sum(r.get("cached_tokens", 0) for r in group),
+                "total_tokens": sum(r.get("total_tokens", 0) for r in group),
+                "llm_cost_usd": round(sum(r.get("llm_cost_usd", 0.0) for r in group), 7),
+                "tool_cost_usd": round(sum(r.get("tool_cost_usd", 0.0) for r in group), 7),
+                "total_cost_usd": round(sum(r.get("total_cost_usd", 0.0) for r in group), 7),
+                "gross_cost_usd": round(sum(r.get("gross_cost_usd", 0.0) for r in group), 7),
+                "savings_usd": round(sum(r.get("savings_usd", 0.0) for r in group), 7),
+                "savings_pct": 0.0,
+                "tool_calls_count": sum(r.get("tool_calls_count", 0) for r in group),
+                "budget_limit_usd": first.get("budget_limit_usd"),
+                "budget_utilization_pct": first.get("budget_utilization_pct"),
+                "budget_exceeded": any(r.get("budget_exceeded") for r in group),
+                "source": first.get("source", "synthesized"),
+            }
+            enriched.append(synth)
+
+    return sorted(enriched, key=lambda r: (r.get("timestamp", ""), 1 if r.get("agent_role") == "root_rollup" else 0), reverse=True)
 
 
 def collect_telemetry_rows(
@@ -137,7 +255,8 @@ def collect_telemetry_rows(
 
     # 0. Include any rows pushed via POST /api/ingest from remote org agents
     if _INGESTED_ROWS:
-        deduped.update(_INGESTED_ROWS)
+        for k, v in _INGESTED_ROWS.items():
+            deduped[k] = dict(v)
         sources_found.append("http_ingest")
 
     # 1. Read local JSONL and CSV files across one or more comma-separated log_dir paths
@@ -185,12 +304,14 @@ def collect_telemetry_rows(
             budget_info = summary.get("budget", {})
             models_used = list(sess_info.get("breakdown_by_model", {}).keys())
             scope_model = models_used[0] if len(models_used) == 1 else None
+            sess_root = sess_info.get("root_agent_name")
             agg_row = _normalize_row(
                 {
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "session_id": sess_id,
                     "scope": "session",
                     "agent_name": None,
+                    "root_agent_name": sess_root,
                     "model_name": scope_model,
                     "status": sess_info.get("status", "pending"),
                     "is_failure": sess_info.get("is_failure", False),
@@ -211,6 +332,8 @@ def collect_telemetry_rows(
                         "session_id": sess_id,
                         "scope": "session",
                         "agent_name": a_name,
+                        "root_agent_name": a_data.get("root_agent_name") or sess_root,
+                        "parent_agent_name": a_data.get("parent_agent_name"),
                         "model_name": a_data.get("model_name"),
                         "status": sess_info.get("status", "pending"),
                         "is_failure": sess_info.get("is_failure", False),
@@ -247,6 +370,8 @@ def collect_telemetry_rows(
                   COALESCE(JSON_VALUE(tags, '$.status'), 'success') AS status,
                   COALESCE(CAST(JSON_VALUE(tags, '$.is_failure') AS BOOL), FALSE) AS is_failure,
                   JSON_VALUE(tags, '$.error') AS error,
+                  JSON_VALUE(tags, '$.root_agent_name') AS root_agent_name,
+                  JSON_VALUE(tags, '$.parent_agent_name') AS parent_agent_name,
                   prompt_tokens,
                   completion_tokens,
                   thoughts_tokens,
@@ -262,6 +387,7 @@ def collect_telemetry_rows(
                   budget_limit_usd,
                   budget_utilization_pct,
                   budget_exceeded,
+                  breakdown_by_agent,
                   tags
                 FROM `{resolved_bq}`
                 ORDER BY timestamp DESC
@@ -282,7 +408,7 @@ def collect_telemetry_rows(
         if _BQ_CACHE["rows"] and "bigquery" not in sources_found:
             sources_found.append("bigquery")
 
-    rows = sorted(deduped.values(), key=lambda r: r.get("timestamp", ""), reverse=True)
+    rows = _enrich_hierarchy(list(deduped.values()))
     return {
         "rows": rows,
         "sources": sources_found,
@@ -341,28 +467,34 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="card p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+    <!-- Hierarchical Filter Bar -->
+    <div class="card p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
       <div>
-        <label class="block text-xs text-gray-400 mb-1">Session Filter</label>
+        <label class="block text-xs text-indigo-300 font-semibold mb-1">1. 👑 Root (Parent) Agent</label>
+        <select id="rootAgentFilter" onchange="onRootAgentChange()" class="w-full bg-gray-900 border border-indigo-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium">
+          <option value="ALL">All Root Agents (Overall Rollup)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-cyan-300 font-semibold mb-1">2. ↳ Sub-Agent Drilldown</label>
+        <select id="subAgentFilter" onchange="onSubAgentChange()" class="w-full bg-gray-900 border border-cyan-800/70 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+          <option value="ALL">∑ Overall Parent Total (Root + Sub-Agents)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-300 font-medium mb-1">3. Session Filter (Scoped)</label>
         <select id="sessionFilter" onchange="renderDashboard()" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
           <option value="ALL">All Sessions</option>
         </select>
       </div>
       <div>
-        <label class="block text-xs text-gray-400 mb-1">Agent Filter</label>
-        <select id="agentFilter" onchange="renderDashboard()" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-          <option value="ALL">All Agents</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-xs text-gray-400 mb-1">Model Filter</label>
+        <label class="block text-xs text-gray-400 mb-1">4. Model Filter</label>
         <select id="modelFilter" onchange="renderDashboard()" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
           <option value="ALL">All Models</option>
         </select>
       </div>
       <div>
-        <label class="block text-xs text-gray-400 mb-1">Task Outcome</label>
+        <label class="block text-xs text-gray-400 mb-1">5. Task Outcome</label>
         <select id="outcomeFilter" onchange="renderDashboard()" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
           <option value="ALL">All Outcomes (Success + Wasted)</option>
           <option value="EFFECTIVE">✅ Effective Spend Only (Success)</option>
@@ -373,8 +505,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-      <div class="card p-4">
-        <div class="text-xs text-gray-400 font-medium">Total Spend (USD)</div>
+      <div class="card p-4 border-indigo-900/60">
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-gray-400 font-medium">Total Spend (USD)</div>
+          <span id="kpiScopeBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono">∑ Parent Rollup</span>
+        </div>
         <div id="kpiTotalCost" class="text-2xl font-bold text-white mt-1">$0.0000</div>
         <div id="kpiCostSub" class="text-xs text-gray-400 mt-1">LLM: $0.0000 • Tools: $0.0000</div>
       </div>
@@ -400,6 +535,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- Root (Parent) Agent -> Sub-Agent Hierarchy Explorer -->
+    <div class="card p-4 mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 pb-2 border-b border-gray-800">
+        <div>
+          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            <span>👑 Root (Parent) Agent ➔ Sub-Agents Hierarchy Rollup</span>
+          </h2>
+          <p class="text-xs text-gray-400">
+            Shows overall parent-level spend & tokens (Root Orchestrator + all delegated Sub-Agents) and each child's share. Click any card to filter.
+          </p>
+        </div>
+        <button onclick="resetHierarchyFilter()" class="text-xs bg-gray-800 hover:bg-gray-700 text-indigo-300 border border-gray-700 px-2.5 py-1 rounded-lg self-start sm:self-auto">
+          Reset Agent Hierarchy Filter
+        </button>
+      </div>
+      <div id="hierarchyContainer" class="space-y-4"></div>
+    </div>
+
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
       <div class="card p-4">
@@ -409,7 +562,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
       </div>
       <div class="card p-4">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Cost Attribution by Agent ($)</h2>
+        <h2 id="agentChartTitle" class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Sub-Agent Cost Attribution ($)</h2>
         <div class="h-56">
           <canvas id="agentChart"></canvas>
         </div>
@@ -425,7 +578,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <!-- Live Telemetry Table -->
     <div class="card overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-white">Near-Live Session & Agent Telemetry</h2>
+        <h2 class="text-sm font-semibold text-white">Near-Live Session & Hierarchical Agent Telemetry</h2>
         <span id="rowCountBadge" class="text-xs text-gray-400 font-mono">0 records</span>
       </div>
       <div class="overflow-x-auto">
@@ -434,7 +587,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <tr class="bg-gray-900/90 text-gray-400 border-b border-gray-800">
               <th class="py-2.5 px-3">Time (UTC)</th>
               <th class="py-2.5 px-3">Session ID</th>
-              <th class="py-2.5 px-3">Agent</th>
+              <th class="py-2.5 px-3">👑 Root (Parent) Agent</th>
+              <th class="py-2.5 px-3">↳ Agent / Hierarchy Role</th>
               <th class="py-2.5 px-3">Model</th>
               <th class="py-2.5 px-3">Outcome</th>
               <th class="py-2.5 px-3 text-right">Tokens (In/Out/Think)</th>
@@ -480,47 +634,149 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
 
     function updateFilterDropdowns() {
-      const sessions = new Set(), agents = new Set(), models = new Set();
+      const rootAgents = new Set();
       rawRows.forEach(r => {
-        if (r.session_id) sessions.add(r.session_id);
-        if (r.agent_name) agents.add(r.agent_name);
-        if (r.model_name) models.add(r.model_name);
+        if (r.root_agent_name) rootAgents.add(r.root_agent_name);
       });
-      syncSelect('sessionFilter', 'All Sessions', [...sessions]);
-      syncSelect('agentFilter', 'All Agents', [...agents]);
-      syncSelect('modelFilter', 'All Models', [...models]);
+      syncSelect('rootAgentFilter', 'All Root Agents (Overall Rollup)', [...rootAgents].map(ra => ({ value: ra, label: `👑 ${ra} (Parent Rollup)` })));
+      populateDependentDropdowns();
+    }
+
+    function populateDependentDropdowns() {
+      const rootVal = document.getElementById('rootAgentFilter').value;
+      const subAgents = new Map();
+
+      // 1. Populate Sub-Agents belonging to the selected Root Agent
+      rawRows.forEach(r => {
+        const rRoot = r.root_agent_name || 'root_agent';
+        if (rootVal !== 'ALL' && rRoot !== rootVal) return;
+        if (r.agent_name) {
+          const isRootSelf = r.agent_name === rRoot;
+          const label = isRootSelf
+            ? `👑 ${r.agent_name} (Root Orchestrator Direct Only)`
+            : (rootVal === 'ALL' ? `↳ 🤖 ${r.agent_name} [under ${rRoot}]` : `↳ 🤖 ${r.agent_name} (Sub-Agent)`);
+          subAgents.set(r.agent_name, label);
+        }
+      });
+      const subItems = [...subAgents.entries()].map(([val, label]) => ({ value: val, label }));
+      const allSubLabel = rootVal === 'ALL'
+        ? '∑ Overall Parent Total (All Root + Sub-Agents)'
+        : `∑ ${rootVal} Overall Total (Parent + Sub-Agents)`;
+      syncSelect('subAgentFilter', allSubLabel, subItems);
+
+      // 2. Populate Sessions & Models scoped strictly to the selected Root Agent (and Sub-Agent if selected)
+      const subVal = document.getElementById('subAgentFilter').value;
+      const sessions = new Map();
+      const models = new Set();
+
+      rawRows.forEach(r => {
+        const rRoot = r.root_agent_name || 'root_agent';
+        if (rootVal !== 'ALL' && rRoot !== rootVal) return;
+        if (subVal !== 'ALL' && r.agent_name !== subVal) return;
+        if (r.session_id && !sessions.has(r.session_id)) {
+          const sessLabel = rootVal === 'ALL'
+            ? `${r.session_id} (${rRoot})`
+            : r.session_id;
+          sessions.set(r.session_id, sessLabel);
+        }
+        if (r.model_name) {
+          models.add(r.model_name);
+        }
+      });
+
+      const sessItems = [...sessions.entries()].map(([val, label]) => ({ value: val, label }));
+      const allSessLabel = rootVal === 'ALL'
+        ? `All Sessions (${sessItems.length})`
+        : `All Sessions for ${rootVal} (${sessItems.length})`;
+      syncSelect('sessionFilter', allSessLabel, sessItems);
+
+      const modelItems = [...models].map(m => ({ value: m, label: m }));
+      syncSelect('modelFilter', 'All Models', modelItems);
+    }
+
+    function onRootAgentChange() {
+      document.getElementById('subAgentFilter').value = 'ALL';
+      document.getElementById('sessionFilter').value = 'ALL';
+      populateDependentDropdowns();
+      renderDashboard();
+    }
+
+    function onSubAgentChange() {
+      populateDependentDropdowns();
+      renderDashboard();
+    }
+
+    function selectHierarchyTarget(rootName, subName) {
+      document.getElementById('rootAgentFilter').value = rootName || 'ALL';
+      populateDependentDropdowns();
+      document.getElementById('subAgentFilter').value = subName || 'ALL';
+      populateDependentDropdowns();
+      renderDashboard();
+    }
+
+    function resetHierarchyFilter() {
+      document.getElementById('rootAgentFilter').value = 'ALL';
+      document.getElementById('subAgentFilter').value = 'ALL';
+      document.getElementById('sessionFilter').value = 'ALL';
+      populateDependentDropdowns();
+      renderDashboard();
     }
 
     function syncSelect(id, allLabel, items) {
       const sel = document.getElementById(id);
       const cur = sel.value;
       sel.innerHTML = `<option value="ALL">${allLabel}</option>` +
-        items.map(x => `<option value="${x}">${x}</option>`).join('');
-      if (items.includes(cur)) sel.value = cur;
+        items.map(x => `<option value="${x.value}">${x.label}</option>`).join('');
+      if (items.some(x => x.value === cur)) {
+        sel.value = cur;
+      } else {
+        sel.value = 'ALL';
+      }
     }
 
     function renderDashboard() {
       const sessVal = document.getElementById('sessionFilter').value;
-      const agentVal = document.getElementById('agentFilter').value;
+      const rootVal = document.getElementById('rootAgentFilter').value;
+      const subVal = document.getElementById('subAgentFilter').value;
       const modelVal = document.getElementById('modelFilter').value;
       const outcomeVal = document.getElementById('outcomeFilter').value;
 
-      // Focus on session-scope rows to avoid double-counting turn + session
       const sessionScopeRows = rawRows.filter(r => r.scope === 'session');
       const baseRows = sessionScopeRows.length > 0 ? sessionScopeRows : rawRows;
 
-      const filtered = baseRows.filter(r => {
+      // Filter rows by Session, Root Agent, and Outcome first (used for Hierarchy Tree & Charts)
+      const parentMatchedRows = baseRows.filter(r => {
         if (sessVal !== 'ALL' && r.session_id !== sessVal) return false;
-        if (agentVal !== 'ALL' && r.agent_name !== agentVal) return false;
-        if (modelVal !== 'ALL' && r.model_name !== modelVal) return false;
+        if (rootVal !== 'ALL' && (r.root_agent_name || 'root_agent') !== rootVal) return false;
         if (outcomeVal === 'EFFECTIVE' && r.is_failure) return false;
         if (outcomeVal === 'WASTED' && !r.is_failure) return false;
         return true;
       });
 
-      // Use aggregate rows (agent_name === null) when Agent Filter is ALL, else use per-agent rows
-      let kpiRows = filtered.filter(r => agentVal === 'ALL' ? !r.agent_name : true);
-      if (kpiRows.length === 0) kpiRows = filtered;
+      // Rows matching Sub-Agent and Model filters as well
+      const filtered = parentMatchedRows.filter(r => {
+        if (subVal !== 'ALL' && r.agent_name !== subVal) return false;
+        if (modelVal !== 'ALL' && r.model_name !== modelVal) return false;
+        return true;
+      });
+
+      // Determine KPI rows:
+      // - When subVal === 'ALL' and modelVal === 'ALL', use root_rollup rows (agent_name === null) so KPIs show true Overall Parent-Level Spend!
+      // - Otherwise sum the matching child/model rows.
+      let kpiRows = [];
+      if (subVal === 'ALL' && modelVal === 'ALL') {
+        kpiRows = parentMatchedRows.filter(r => !r.agent_name);
+        if (kpiRows.length === 0) kpiRows = parentMatchedRows.filter(r => r.agent_name);
+        document.getElementById('kpiScopeBadge').innerText = rootVal === 'ALL'
+          ? '∑ All Root Rollups'
+          : `∑ ${rootVal} (Parent Total)`;
+      } else {
+        kpiRows = filtered.filter(r => r.agent_name);
+        if (kpiRows.length === 0) kpiRows = filtered;
+        document.getElementById('kpiScopeBadge').innerText = subVal !== 'ALL'
+          ? `↳ ${subVal}`
+          : `Model: ${modelVal}`;
+      }
 
       let totalCost = 0, llmCost = 0, toolCost = 0, effCost = 0, wastedCost = 0, savedCost = 0;
       let totalTok = 0, inTok = 0, outTok = 0, thinkTok = 0, cachedTok = 0;
@@ -549,7 +805,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       document.getElementById('kpiTotalCost').innerText = `$${totalCost.toFixed(4)}`;
       document.getElementById('kpiCostSub').innerText = `LLM: $${llmCost.toFixed(4)} • Grounding: $${toolCost.toFixed(4)}`;
       document.getElementById('kpiEffectiveCost').innerText = `$${effCost.toFixed(4)}`;
-      document.getElementById('kpiEffectiveSub').innerText = `${succCount} successful session(s)`;
+      document.getElementById('kpiEffectiveSub').innerText = `${succCount} successful record(s)`;
       document.getElementById('kpiWastedCost').innerText = `$${wastedCost.toFixed(4)}`;
       document.getElementById('kpiWastedSub').innerText = `${wastedPct}% of total spend (${failCount} failed)`;
       document.getElementById('kpiSavingsCost').innerText = `$${savedCost.toFixed(4)}`;
@@ -557,19 +813,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       document.getElementById('kpiTotalTokens').innerText = totalTok.toLocaleString();
       document.getElementById('kpiTokenSub').innerText = `In: ${inTok.toLocaleString()} • Out: ${outTok.toLocaleString()} • Think: ${thinkTok.toLocaleString()}`;
 
-      // Agent Breakdown
-      const agentRows = filtered.filter(r => r.agent_name);
+      renderHierarchyTree(parentMatchedRows, rootVal, subVal);
+
+      // Sub-Agent Breakdown for Chart (when a Root Agent is selected, show its children even if subVal === 'ALL')
+      const chartSourceRows = (subVal === 'ALL' ? parentMatchedRows : filtered).filter(r => r.agent_name && (modelVal === 'ALL' || r.model_name === modelVal));
       const agentMap = {};
-      agentRows.forEach(r => {
-        if (!agentMap[r.agent_name]) agentMap[r.agent_name] = { llm: 0, tool: 0, tokens: 0, model: r.model_name };
-        agentMap[r.agent_name].llm += r.llm_cost_usd || 0;
-        agentMap[r.agent_name].tool += r.tool_cost_usd || 0;
-        agentMap[r.agent_name].tokens += r.total_tokens || 0;
+      chartSourceRows.forEach(r => {
+        const isRootSelf = r.agent_name === r.root_agent_name;
+        const label = isRootSelf ? `👑 ${r.agent_name} (Direct)` : `↳ 🤖 ${r.agent_name}`;
+        if (!agentMap[label]) agentMap[label] = { llm: 0, tool: 0, tokens: 0, model: r.model_name };
+        agentMap[label].llm += r.llm_cost_usd || 0;
+        agentMap[label].tool += r.tool_cost_usd || 0;
+        agentMap[label].tokens += r.total_tokens || 0;
       });
+      document.getElementById('agentChartTitle').innerText = rootVal === 'ALL'
+        ? 'Root & Sub-Agent Cost Attribution ($)'
+        : `Sub-Agents of 👑 ${rootVal} ($ Spend)`;
 
       // Model Breakdown
       const modelMap = {};
-      (agentRows.length ? agentRows : kpiRows).forEach(r => {
+      (chartSourceRows.length ? chartSourceRows : kpiRows).forEach(r => {
         const m = r.model_name || 'gemini-2.5-flash';
         if (!modelMap[m]) modelMap[m] = { prompt: 0, completion: 0, thoughts: 0, cached: 0 };
         modelMap[m].prompt += r.prompt_tokens || 0;
@@ -579,7 +842,140 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       });
 
       updateCharts(effCost, wastedCost, savedCost, agentMap, modelMap);
-      renderTable(filtered);
+      renderTable(subVal === 'ALL' ? parentMatchedRows.filter(r => modelVal === 'ALL' || !r.agent_name || r.model_name === modelVal) : filtered);
+    }
+
+    function renderHierarchyTree(rows, activeRoot, activeSub) {
+      const container = document.getElementById('hierarchyContainer');
+      const roots = {};
+
+      rows.forEach(r => {
+        const rootName = r.root_agent_name || 'root_agent';
+        if (!roots[rootName]) {
+          roots[rootName] = {
+            rollupCost: 0,
+            rollupTokens: 0,
+            rollupSavings: 0,
+            sessions: new Set(),
+            children: {}
+          };
+        }
+        roots[rootName].sessions.add(r.session_id);
+        if (!r.agent_name) {
+          roots[rootName].rollupCost += r.total_cost_usd || 0;
+          roots[rootName].rollupTokens += r.total_tokens || 0;
+          roots[rootName].rollupSavings += r.savings_usd || 0;
+        } else {
+          const cName = r.agent_name;
+          if (!roots[rootName].children[cName]) {
+            roots[rootName].children[cName] = {
+              name: cName,
+              isRootSelf: cName === rootName,
+              cost: 0,
+              llmCost: 0,
+              toolCost: 0,
+              tokens: 0,
+              prompt: 0,
+              completion: 0,
+              thoughts: 0,
+              models: new Set()
+            };
+          }
+          const c = roots[rootName].children[cName];
+          c.cost += r.total_cost_usd || 0;
+          c.llmCost += r.llm_cost_usd || 0;
+          c.toolCost += r.tool_cost_usd || 0;
+          c.tokens += r.total_tokens || 0;
+          c.prompt += r.prompt_tokens || 0;
+          c.completion += r.completion_tokens || 0;
+          c.thoughts += r.thoughts_tokens || 0;
+          if (r.model_name) c.models.add(r.model_name);
+        }
+      });
+
+      const rootNames = Object.keys(roots);
+      if (rootNames.length === 0) {
+        container.innerHTML = `<div class="text-xs text-gray-500 py-3">No hierarchical agent telemetry recorded yet.</div>`;
+        return;
+      }
+
+      container.innerHTML = rootNames.map(rName => {
+        const info = roots[rName];
+        const childList = Object.values(info.children).sort((a, b) => (a.isRootSelf === b.isRootSelf) ? (b.cost - a.cost) : (a.isRootSelf ? -1 : 1));
+        const sumChildrenCost = childList.reduce((acc, c) => acc + c.cost, 0);
+        const parentTotalCost = info.rollupCost > 0 ? info.rollupCost : sumChildrenCost;
+        const sumChildrenTokens = childList.reduce((acc, c) => acc + c.tokens, 0);
+        const parentTotalTokens = info.rollupTokens > 0 ? info.rollupTokens : sumChildrenTokens;
+        const subCount = childList.filter(c => !c.isRootSelf).length;
+        const isSelectedRoot = activeRoot === rName && activeSub === 'ALL';
+
+        const childrenHtml = childList.map(c => {
+          const sharePct = parentTotalCost > 0 ? ((c.cost / parentTotalCost) * 100).toFixed(1) : '0.0';
+          const isSelectedSub = activeSub === c.name;
+          const roleBadge = c.isRootSelf
+            ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 font-semibold">👑 ROOT DIRECT</span>`
+            : `<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">↳ 🤖 SUB-AGENT</span>`;
+          const borderCls = isSelectedSub
+            ? 'border-cyan-400 bg-cyan-950/30 ring-1 ring-cyan-400'
+            : 'border-gray-800 bg-gray-900/70 hover:border-gray-600';
+          const barColor = c.isRootSelf ? 'bg-indigo-500' : 'bg-cyan-500';
+          return `
+            <div onclick="selectHierarchyTarget('${rName}', '${c.name}')" class="cursor-pointer rounded-lg border p-3 transition ${borderCls}">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <div class="flex items-center gap-1.5 truncate">
+                  ${roleBadge}
+                  <span class="text-xs font-semibold text-white truncate">${c.name}</span>
+                </div>
+                <span class="text-xs font-bold text-white font-mono">$${c.cost.toFixed(5)}</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-gray-400 mb-1.5">
+                <span class="truncate">Model: <span class="text-gray-300 font-mono">${[...c.models].join(', ') || 'default'}</span></span>
+                <span class="text-cyan-300 font-mono">${sharePct}% of parent</span>
+              </div>
+              <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden mb-1.5">
+                <div class="${barColor} h-1.5 rounded-full" style="width: ${Math.min(100, Math.max(2, parseFloat(sharePct)))}%"></div>
+              </div>
+              <div class="text-[10px] text-gray-400 font-mono flex justify-between">
+                <span>Tokens: ${c.tokens.toLocaleString()}</span>
+                <span>In:${c.prompt} Out:${c.completion} Think:${c.thoughts}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const rootBorder = isSelectedRoot ? 'border-indigo-500 ring-1 ring-indigo-500/60' : 'border-gray-800';
+        return `
+          <div class="rounded-xl border ${rootBorder} bg-gray-950/60 p-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-3 mb-3 border-b border-gray-800/80">
+              <div class="flex flex-wrap items-center gap-2.5">
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-950 text-amber-300 border border-amber-700/80">
+                  ∑ PARENT LEVEL ROLLUP
+                </span>
+                <span class="text-sm font-bold text-white font-mono">👑 ${rName}</span>
+                <span class="text-xs text-gray-400">
+                  (${subCount} Sub-Agent${subCount === 1 ? '' : 's'} • ${info.sessions.size} Session${info.sessions.size === 1 ? '' : 's'})
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-4">
+                <div class="text-right">
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Spend</div>
+                  <div class="text-sm font-bold text-amber-300 font-mono">$${parentTotalCost.toFixed(5)}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Tokens</div>
+                  <div class="text-sm font-bold text-indigo-300 font-mono">${parentTotalTokens.toLocaleString()}</div>
+                </div>
+                <button onclick="selectHierarchyTarget('${rName}', 'ALL')" class="text-xs px-3 py-1.5 rounded-lg font-medium ${isSelectedRoot ? 'bg-indigo-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-indigo-300 border border-gray-700'}">
+                  ${isSelectedRoot ? '✓ Viewing Parent Rollup' : 'Filter Root & Show Sub-Agents'}
+                </button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              ${childrenHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function updateCharts(effCost, wastedCost, savedCost, agentMap, modelMap) {
@@ -660,10 +1056,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           : 'bg-emerald-950 text-emerald-400 border-emerald-800';
         const outcomeLabel = (r.status || 'success').toUpperCase();
         const ts = (r.timestamp || '').replace('T', ' ').slice(0, 19);
-        return `<tr class="hover:bg-gray-900/50">
+        const rootLabel = `<span class="text-indigo-300 font-semibold">👑 ${r.root_agent_name || 'root_agent'}</span>`;
+        let agentRoleCell = '';
+        if (!r.agent_name) {
+          agentRoleCell = `<span class="px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/80 text-[11px] font-bold">∑ OVERALL PARENT TOTAL (${r.root_agent_name || 'root'})</span>`;
+        } else if (r.agent_name === r.root_agent_name) {
+          agentRoleCell = `<span class="text-indigo-200 font-semibold">👑 ${r.agent_name} <span class="text-[10px] text-indigo-400">[ROOT DIRECT]</span></span>`;
+        } else {
+          agentRoleCell = `<span class="text-cyan-300">↳ 🤖 ${r.agent_name} <span class="text-[10px] text-gray-400">[SUB-AGENT]</span></span>`;
+        }
+        return `<tr class="hover:bg-gray-900/50 ${!r.agent_name ? 'bg-amber-950/10' : ''}">
           <td class="py-2 px-3 text-gray-400">${ts}</td>
           <td class="py-2 px-3 text-indigo-300 font-medium">${r.session_id}</td>
-          <td class="py-2 px-3 text-gray-200">${r.agent_name ? '🤖 ' + r.agent_name : '<span class="text-xs text-amber-300 font-semibold">∑ SESSION TOTAL</span>'}</td>
+          <td class="py-2 px-3">${rootLabel}</td>
+          <td class="py-2 px-3">${agentRoleCell}</td>
           <td class="py-2 px-3 text-gray-300">${r.model_name || 'ALL'}</td>
           <td class="py-2 px-3"><span class="px-2 py-0.5 rounded border text-[10px] font-semibold ${badgeClass}">${outcomeLabel}</span></td>
           <td class="py-2 px-3 text-right text-gray-300">${(r.total_tokens||0).toLocaleString()} <span class="text-gray-500">(${r.prompt_tokens}/${r.completion_tokens}/${r.thoughts_tokens})</span></td>

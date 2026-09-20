@@ -181,19 +181,59 @@ class FinOpsCostPlugin(BasePlugin):
         session_id = session_id or turn_id
         return turn_id, session_id
 
+    def _register_agent_tree(
+        self,
+        agent: Any,
+        root_name: str | None = None,
+        parent_name: str | None = None,
+    ) -> str | None:
+        """Recursively discovers and registers ADK root -> sub-agent hierarchy."""
+        if agent is None:
+            return root_name
+        name = getattr(agent, "name", None)
+        if not isinstance(name, str) or not name:
+            return root_name
+
+        actual_root = root_name
+        root_obj = getattr(agent, "root_agent", None)
+        if root_obj is not None and isinstance(getattr(root_obj, "name", None), str):
+            actual_root = getattr(root_obj, "name")
+        if actual_root is None:
+            actual_root = name
+
+        actual_parent = parent_name
+        parent_obj = getattr(agent, "parent_agent", None)
+        if parent_obj is not None and isinstance(getattr(parent_obj, "name", None), str):
+            actual_parent = getattr(parent_obj, "name")
+
+        CostTracker.register_agent_hierarchy(
+            agent_name=name,
+            parent_agent_name=actual_parent if actual_parent != name else None,
+            root_agent_name=actual_root,
+        )
+        for sub in getattr(agent, "sub_agents", None) or []:
+            self._register_agent_tree(sub, root_name=actual_root, parent_name=name)
+        return actual_root
+
     def _extract_agent_name(self, ctx: Any) -> str:
-        """Extracts the agent name from callback/invocation/tool context."""
+        """Extracts the agent name and registers any discoverable agent hierarchy from context."""
+        agent_obj = getattr(ctx, "agent", None)
+        if agent_obj is not None:
+            self._register_agent_tree(agent_obj)
+
+        inv_ctx = getattr(ctx, "invocation_context", None) or getattr(ctx, "_invocation_context", None)
+        if inv_ctx is not None and getattr(inv_ctx, "agent", None) is not None:
+            self._register_agent_tree(getattr(inv_ctx, "agent", None))
+
         agent_name = getattr(ctx, "agent_name", None)
         if isinstance(agent_name, str) and agent_name:
             return agent_name
 
-        agent = getattr(ctx, "agent", None)
-        if agent is not None:
-            name = getattr(agent, "name", None)
+        if agent_obj is not None:
+            name = getattr(agent_obj, "name", None)
             if isinstance(name, str) and name:
                 return name
 
-        inv_ctx = getattr(ctx, "invocation_context", None)
         if inv_ctx is not None:
             agent = getattr(inv_ctx, "agent", None)
             if agent is not None:
@@ -212,7 +252,8 @@ class FinOpsCostPlugin(BasePlugin):
                 exporter.ensure_provider_ready()
 
         turn_id, session_id = self._extract_ids(invocation_context)
-        CostTracker.start_turn(turn_id=turn_id, session_id=session_id)
+        root_name = self._register_agent_tree(getattr(invocation_context, "agent", None))
+        CostTracker.start_turn(turn_id=turn_id, session_id=session_id, root_agent_name=root_name)
         msg = f"[FinOps] Initialized cost tracking: turn={turn_id[:8]} session={session_id[:8]}"
         print(msg, flush=True)
         logger.info(msg)

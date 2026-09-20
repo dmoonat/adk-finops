@@ -49,6 +49,8 @@ class BaseExporter(ABC):
         budget_info: dict[str, Any] | None,
         agent_name: str | None = None,
         model_name: str | None = None,
+        root_agent_name: str | None = None,
+        parent_agent_name: str | None = None,
         tags: dict[str, Any] | None = None,
         include_status_fields: bool = False,
     ) -> dict[str, Any]:
@@ -64,6 +66,22 @@ class BaseExporter(ABC):
 
         breakdown_by_agent = scope_data.get("breakdown_by_agent")
         breakdown_by_model = scope_data.get("breakdown_by_model")
+
+        eff_root = root_agent_name or scope_data.get("root_agent_name")
+        if not eff_root and isinstance(breakdown_by_agent, dict) and breakdown_by_agent:
+            eff_root = next(iter(breakdown_by_agent.keys()), None)
+
+        eff_parent = parent_agent_name
+        if eff_parent is None:
+            eff_parent = scope_data.get("parent_agent_name")
+        if eff_parent is None and agent_name and eff_root and agent_name != eff_root:
+            eff_parent = eff_root
+
+        merged_tags = dict(tags) if tags else {}
+        if eff_root:
+            merged_tags.setdefault("root_agent_name", eff_root)
+        if eff_parent:
+            merged_tags.setdefault("parent_agent_name", eff_parent)
 
         row: dict[str, Any] = {
             "timestamp": now_utc,
@@ -91,18 +109,20 @@ class BaseExporter(ABC):
             "budget_exceeded": b_exceeded,
             "breakdown_by_agent": json.dumps(breakdown_by_agent) if breakdown_by_agent else None,
             "breakdown_by_model": json.dumps(breakdown_by_model) if breakdown_by_model else None,
-            "tags": json.dumps(tags) if tags else None,
+            "tags": json.dumps(merged_tags) if merged_tags else None,
         }
 
         if include_status_fields:
-            status = scope_data.get("status") or (tags or {}).get("status") or "success"
+            status = scope_data.get("status") or merged_tags.get("status") or "success"
             is_failure = scope_data.get("is_failure")
             if is_failure is None:
-                is_failure = bool((tags or {}).get("is_failure", False))
-            error = scope_data.get("error") or (tags or {}).get("error")
+                is_failure = bool(merged_tags.get("is_failure", False))
+            error = scope_data.get("error") or merged_tags.get("error")
             row["status"] = status
             row["is_failure"] = bool(is_failure)
             row["error"] = error
+            row["root_agent_name"] = eff_root
+            row["parent_agent_name"] = eff_parent
 
         return row
 
@@ -131,6 +151,12 @@ class BaseExporter(ABC):
         for scope_name, scope_data in scopes_to_export:
             models_used = list(scope_data.get("breakdown_by_model", {}).keys())
             scope_model = models_used[0] if len(models_used) == 1 else None
+            agent_breakdown = scope_data.get("breakdown_by_agent", {})
+            scope_root = (
+                scope_data.get("root_agent_name")
+                or sess_info.get("root_agent_name")
+                or (next(iter(agent_breakdown.keys()), None) if agent_breakdown else None)
+            )
 
             rows.append(
                 self._serialize_row(
@@ -141,13 +167,18 @@ class BaseExporter(ABC):
                     budget_info=budget_info,
                     agent_name=None,
                     model_name=scope_model,
+                    root_agent_name=scope_root,
+                    parent_agent_name=None,
                     tags=tags,
                     include_status_fields=include_status_fields,
                 )
             )
 
-            agent_breakdown = scope_data.get("breakdown_by_agent", {})
             for a_name, a_data in agent_breakdown.items():
+                a_root = a_data.get("root_agent_name") or scope_root or a_name
+                a_parent = a_data.get("parent_agent_name")
+                if a_parent is None and a_name != a_root:
+                    a_parent = a_root
                 rows.append(
                     self._serialize_row(
                         scope_data=a_data,
@@ -157,6 +188,8 @@ class BaseExporter(ABC):
                         budget_info=budget_info,
                         agent_name=a_name,
                         model_name=a_data.get("model_name"),
+                        root_agent_name=a_root,
+                        parent_agent_name=a_parent,
                         tags=tags,
                         include_status_fields=include_status_fields,
                     )
@@ -173,6 +206,8 @@ class BaseExporter(ABC):
                             budget_info=budget_info,
                             agent_name=None,
                             model_name=m_name,
+                            root_agent_name=scope_root,
+                            parent_agent_name=None,
                             tags=tags,
                             include_status_fields=include_status_fields,
                         )

@@ -8,7 +8,7 @@
 
 **Universal FinOps cost, token usage, and grounding fee tracking for the Google Agent Development Kit (ADK) and LLM workflows.**
 
-![adk-finops Near-Live FinOps Web Dashboard](img/dashboard.png)
+![adk-finops Near-Live FinOps Web Dashboard](img/filter_dashboard.png)
 
 ---
 
@@ -344,12 +344,18 @@ finops_plugin = FinOpsCostPlugin(
 )
 ```
 
-### Agent Breakdown in Session Telemetry
+### Hierarchical Root (Parent) Agent ➔ Sub-Agent Attribution
 
-Every turn and session summary includes a granular `breakdown_by_agent` dictionary:
+`FinOpsCostPlugin` automatically inspects the ADK agent tree (`agent.root_agent`, `agent.parent_agent`, and `agent.sub_agents`) during execution and tags every agent entry with:
+- `root_agent_name`: The top-level orchestrator / parent agent for the run (e.g., `"supervisor"`).
+- `parent_agent_name`: The immediate parent agent (`null` for the root orchestrator, `"supervisor"` for delegated sub-agents).
+- `agent_role`: `"root_self"` (the root orchestrator's own direct LLM/tool calls), `"sub_agent"` (a delegated specialist sub-agent), or `"root_rollup"` (the overall parent-level session rollup combining the root agent + all its sub-agents).
+
+Every turn and session summary includes this hierarchy inside `breakdown_by_agent`:
 
 ```json
 {
+  "root_agent_name": "supervisor",
   "breakdown_by_agent": {
     "supervisor": {
       "calls": 1,
@@ -361,7 +367,10 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
       "llm_cost_usd": 0.00225,
       "tool_cost_usd": 0.0,
       "total_cost_usd": 0.00225,
-      "savings_usd": 0.0
+      "savings_usd": 0.0,
+      "root_agent_name": "supervisor",
+      "parent_agent_name": null,
+      "agent_role": "root_self"
     },
     "researcher": {
       "calls": 2,
@@ -374,7 +383,10 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
       "tool_cost_usd": 0.028,
       "total_cost_usd": 0.02989,
       "savings_usd": 0.00054,
-      "savings_pct": 22.2
+      "savings_pct": 22.2,
+      "root_agent_name": "supervisor",
+      "parent_agent_name": "supervisor",
+      "agent_role": "sub_agent"
     },
     "coder": {
       "calls": 1,
@@ -386,7 +398,10 @@ Every turn and session summary includes a granular `breakdown_by_agent` dictiona
       "llm_cost_usd": 0.01275,
       "tool_cost_usd": 0.0,
       "total_cost_usd": 0.01275,
-      "savings_usd": 0.0
+      "savings_usd": 0.0,
+      "root_agent_name": "supervisor",
+      "parent_agent_name": "supervisor",
+      "agent_role": "sub_agent"
     }
   }
 }
@@ -795,18 +810,26 @@ Because both aggregate rows and attributed breakdown rows coexist in the same ta
 
 ### Near-Live FinOps Web Dashboard (`adk-finops dashboard`)
 
-![Near-Live FinOps Web Dashboard](img/dashboard.png)
+![Near-Live FinOps Web Dashboard — Overview](img/all_dashboard.png)
 
 `adk-finops` includes a built-in, zero-extra-dependency **FastAPI + Chart.js Near-Live Web Dashboard** that auto-refreshes every **2 seconds**, aggregating:
 1. **Live In-Memory `CostTracker` State:** Watch tokens and spend accumulate in real time while an agent is mid-execution.
 2. **Local Timestamped `.jsonl` & `.csv` Logs:** Automatically scans `logs/<YYYYMMDD_HHMMSS>/*.jsonl` and `*.csv`.
-3. **Remote HTTP Push (`POST /api/ingest`):** Receives telemetry pushed over HTTP from remote agent containers (`HTTPExporter` / `dashboard_endpoint`).
+3. **Remote HTTP Push (`POST /api/ingest`):** Receives telemetry pushed over HTTP from remote agent containers (`HTTPExporter` / `dashboard_endpoint`) and persists it to `<log_dir>/ingested_costs.jsonl`.
 4. **Optional BigQuery Live Sync:** Toggle the **Include BigQuery** switch in the UI (`15s` cache TTL) to merge cloud warehouse records (`ADK_FINOPS_BIGQUERY_TABLE`).
 
-**Interactive Dashboard Features:**
-- **4 Live Filters:** Filter by **Session ID**, **Agent Name**, **Model**, or **Task Outcome** (`✅ Effective Spend` vs `🔥 Wasted Spend`).
-- **5 Executive KPI Cards:** Total Spend ($), Effective Spend ($), Wasted Spend / Capital Loss ($ & %), Context Caching Savings ($), and Total Tokens (`In / Out / Think`).
-- **3 Interactive Charts:** Spend Efficiency & ROI Doughnut, Per-Agent Stacked Cost Bar (LLM vs Grounding), and Per-Model Token Composition.
+#### Hierarchical Root (Parent) Agent ➔ Sub-Agent Drilldown & Cascading Filters
+
+![Near-Live FinOps Web Dashboard — Root Agent & Sub-Agent Filtered View](img/filter_dashboard.png)
+
+- **5 Cascading Hierarchy Filters:**
+  1. **`1. 👑 Root (Parent) Agent`:** Filter by a top-level orchestrator/parent agent (e.g., `👑 coordinator_agent`). Selecting a Root Agent automatically computes the **Overall Parent-Level Spend & Tokens (`∑ Parent + All Sub-Agents`)** in the KPI cards while displaying all of its sub-agents in the breakdown charts and hierarchy tree.
+  2. **`2. ↳ Sub-Agent Drilldown`:** Dynamically cascades to list only the children belonging to the selected Root Agent (`∑ Overall Parent Total`, `👑 Root Orchestrator Direct Only`, or individual `↳ 🤖 Sub-Agents`).
+  3. **`3. Session Filter (Scoped)`:** Automatically scopes the session dropdown so it **only lists sessions belonging to the selected Root Agent (and Sub-Agent)**.
+  4. **`4. Model Filter`:** Scoped to the models invoked by the selected Root / Sub-Agent.
+  5. **`5. Task Outcome`:** Filter between `✅ Effective Spend Only (Success)` and `🔥 Wasted Spend Only (Failed / Error / Budget)`.
+- **`👑 Root (Parent) Agent ➔ Sub-Agents Hierarchy Rollup` Explorer:** Interactive parent-to-child cards showing each Root Agent's overall parent rollup (`∑ Overall Parent Spend` and `Overall Parent Tokens`) alongside each child's spend, token breakdown (`In / Out / Think`), model, and **percentage share of parent spend** with click-to-filter support.
+- **5 Executive KPI Cards & 3 Interactive Charts:** Total Spend ($ with active scope badge), Effective Spend ($), Wasted Spend ($ & %), Context Caching Savings ($), Total Tokens (`In / Out / Think`), Spend Efficiency Doughnut, Sub-Agent Stacked Cost Bar (LLM vs Grounding), and Per-Model Token Composition.
 
 ---
 
@@ -828,7 +851,7 @@ finops_plugin = FinOpsCostPlugin(
 
 #### Enterprise & Org Admin Mode: Standalone Centralized Dashboard (`3 Patterns`)
 
-An organization admin can run `adk-finops dashboard` as a **single centralized FinOps control plane** (with zero agents running inside the dashboard process) to monitor dozens of independent agents across teams:
+An organization admin can run `adk-finops dashboard` as a **single centralized FinOps control plane** (with zero agents running inside the dashboard process) to monitor dozens of independent root agents and sub-agent teams across an organization:
 
 ##### Pattern A: Central Cloud Warehouse Mode (BigQuery Only)
 All agents across the org stream to a shared BigQuery table (`ADK_FINOPS_BIGQUERY_TABLE="org-project.finops.agent_costs"`). The admin runs the standalone dashboard pointing strictly to BigQuery:
@@ -864,7 +887,7 @@ When an organization does not use BigQuery and agents run in isolated containers
        export_tags={"team": "payments", "service": "refund_agent"},
    )
    ```
-   The central dashboard receives the rows in real time **and** persists them to `central_logs/ingested_costs.jsonl` so telemetry survives server restarts.
+   - **Real-Time Memory + Automatic Disk Persistence (`<log_dir>/ingested_costs.jsonl`):** Every HTTP-pushed batch is immediately served from in-memory cache (`source="http_ingest"`) **and** appended to `central_logs/ingested_costs.jsonl` on the dashboard server. If the dashboard server is restarted later with `--log-dir central_logs`, all previously pushed sessions and agent hierarchies are automatically restored from `ingested_costs.jsonl` without any data loss or double-counting.
 
 ---
 

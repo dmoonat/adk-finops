@@ -62,6 +62,49 @@ class CostTracker:
     _budgets: ClassVar[dict[str, dict[str, float]]] = {}
     _global_budget: ClassVar[dict[str, float]] = {}
     _task_history: ClassVar[list[dict[str, Any]]] = []
+    _agent_hierarchy: ClassVar[dict[str, dict[str, str | None]]] = {}
+
+    @classmethod
+    def register_agent_hierarchy(
+        cls,
+        agent_name: str,
+        parent_agent_name: str | None = None,
+        root_agent_name: str | None = None,
+    ) -> None:
+        """Registers the parent and root agent relationship for a given agent."""
+        if not agent_name:
+            return
+        with cls._lock:
+            eff_root = root_agent_name or parent_agent_name or agent_name
+            eff_parent = parent_agent_name if parent_agent_name != agent_name else None
+            cls._agent_hierarchy[agent_name] = {
+                "parent_agent_name": eff_parent,
+                "root_agent_name": eff_root,
+            }
+
+    @classmethod
+    def get_agent_hierarchy(
+        cls,
+        agent_name: str | None,
+        session_id: str | None = None,
+    ) -> tuple[str | None, str | None]:
+        """Returns (parent_agent_name, root_agent_name) for an agent within a session."""
+        with cls._lock:
+            sess_root = None
+            if session_id and session_id in cls._active_runs:
+                sess_root = cls._active_runs[session_id].get("root_agent_name")
+            if agent_name and agent_name in cls._agent_hierarchy:
+                info = cls._agent_hierarchy[agent_name]
+                root = info.get("root_agent_name") or sess_root or agent_name
+                parent = info.get("parent_agent_name")
+                if parent is None and root and agent_name != root:
+                    parent = root
+                return parent, root
+            if agent_name:
+                root = sess_root or agent_name
+                parent = root if agent_name != root else None
+                return parent, root
+            return None, sess_root
 
     @classmethod
     def get_registry(cls) -> RateCardRegistry:
@@ -121,6 +164,7 @@ class CostTracker:
             cls._budgets.clear()
             cls._global_budget.clear()
             cls._task_history.clear()
+            cls._agent_hierarchy.clear()
 
     @classmethod
     def reset_budgets(cls) -> None:
@@ -400,6 +444,13 @@ class CostTracker:
 
         # Agent breakdown
         if agent_name:
+            if not run.get("root_agent_name"):
+                _, inferred_root = cls.get_agent_hierarchy(agent_name, session_id=run.get("run_id"))
+                run["root_agent_name"] = inferred_root or agent_name
+            eff_root = run.get("root_agent_name") or agent_name
+            parent_from_reg, _ = cls.get_agent_hierarchy(agent_name, session_id=run.get("run_id"))
+            eff_parent = None if agent_name == eff_root else (parent_from_reg or eff_root)
+
             a = run["breakdown_by_agent"].setdefault(
                 agent_name,
                 {
@@ -417,8 +468,14 @@ class CostTracker:
                     "savings_pct": 0.0,
                     "models": [],
                     "model_name": None,
+                    "root_agent_name": eff_root,
+                    "parent_agent_name": eff_parent,
+                    "agent_role": "root_self" if agent_name == eff_root else "sub_agent",
                 },
             )
+            a["root_agent_name"] = eff_root
+            a["parent_agent_name"] = eff_parent
+            a["agent_role"] = "root_self" if agent_name == eff_root else "sub_agent"
             a["calls"] += 1
             if "models" not in a:
                 a["models"] = []
@@ -463,6 +520,13 @@ class CostTracker:
         run["gross_cost_usd"] = round(run.get("gross_cost_usd", 0.0) + total_tool_fee, 7)
 
         if agent_name:
+            if not run.get("root_agent_name"):
+                _, inferred_root = cls.get_agent_hierarchy(agent_name, session_id=run.get("run_id"))
+                run["root_agent_name"] = inferred_root or agent_name
+            eff_root = run.get("root_agent_name") or agent_name
+            parent_from_reg, _ = cls.get_agent_hierarchy(agent_name, session_id=run.get("run_id"))
+            eff_parent = None if agent_name == eff_root else (parent_from_reg or eff_root)
+
             a = run["breakdown_by_agent"].setdefault(
                 agent_name,
                 {
@@ -478,8 +542,14 @@ class CostTracker:
                     "gross_cost_usd": 0.0,
                     "savings_usd": 0.0,
                     "savings_pct": 0.0,
+                    "root_agent_name": eff_root,
+                    "parent_agent_name": eff_parent,
+                    "agent_role": "root_self" if agent_name == eff_root else "sub_agent",
                 },
             )
+            a["root_agent_name"] = eff_root
+            a["parent_agent_name"] = eff_parent
+            a["agent_role"] = "root_self" if agent_name == eff_root else "sub_agent"
             a["tool_calls"] = a.get("tool_calls", 0) + count
             a["tool_cost_usd"] = round(a["tool_cost_usd"] + total_tool_fee, 7)
             a["total_cost_usd"] = round(a["total_cost_usd"] + total_tool_fee, 7)
@@ -504,7 +574,12 @@ class CostTracker:
             cls._active_runs[run_id] = cls._create_empty_run(run_id)
 
     @classmethod
-    def start_turn(cls, turn_id: str, session_id: str | None = None) -> None:
+    def start_turn(
+        cls,
+        turn_id: str,
+        session_id: str | None = None,
+        root_agent_name: str | None = None,
+    ) -> None:
         """Initializes a tracking run for a turn (resetting existing turn counts)
         and ensures the session is tracked without resetting previous turns.
         """
@@ -512,10 +587,15 @@ class CostTracker:
             return
 
         with cls._lock:
-            cls._active_runs[turn_id] = cls._create_empty_run(turn_id)
+            turn_run = cls._create_empty_run(turn_id)
+            if root_agent_name:
+                turn_run["root_agent_name"] = root_agent_name
+            cls._active_runs[turn_id] = turn_run
             if session_id and session_id != turn_id:
                 if session_id not in cls._active_runs:
                     cls._active_runs[session_id] = cls._create_empty_run(session_id)
+                if root_agent_name and not cls._active_runs[session_id].get("root_agent_name"):
+                    cls._active_runs[session_id]["root_agent_name"] = root_agent_name
 
     @classmethod
     def record_usage(

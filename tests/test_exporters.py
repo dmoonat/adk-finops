@@ -163,10 +163,43 @@ def test_dashboard_collect_telemetry_rows(tmp_path: Path):
     jsonl_file = tmp_path / "logs" / "finops_costs.jsonl"
     exporter = JSONLExporter(file_path=jsonl_file)
 
-    summary = _setup_sample_session("sess_dash_01", status="success")
+    CostTracker.register_agent_hierarchy("coordinator_agent", parent_agent_name=None, root_agent_name="coordinator_agent")
+    CostTracker.register_agent_hierarchy("research_agent", parent_agent_name="coordinator_agent", root_agent_name="coordinator_agent")
+    CostTracker.start_turn(turn_id="turn_h1", session_id="sess_dash_01", root_agent_name="coordinator_agent")
+    CostTracker.record_usage(
+        run_id="turn_h1",
+        session_id="sess_dash_01",
+        model_name="gemini-2.5-flash",
+        prompt_tokens=400,
+        completion_tokens=100,
+        agent_name="coordinator_agent",
+    )
+    CostTracker.record_usage(
+        run_id="turn_h1",
+        session_id="sess_dash_01",
+        model_name="gemini-2.5-pro",
+        prompt_tokens=1200,
+        completion_tokens=500,
+        thoughts_tokens=200,
+        agent_name="research_agent",
+    )
+    CostTracker.record_task_status(session_id="sess_dash_01", run_id="turn_h1", status="success")
+    summary = CostTracker.get_summary(run_id="turn_h1", session_id="sess_dash_01", pop=False)
     exporter.export_summary(summary, scope="session")
 
     payload = collect_telemetry_rows(log_dir=tmp_path / "logs", include_bigquery=False)
     assert "local_jsonl" in payload["sources"]
-    assert len(payload["rows"]) >= 2
-    assert any(r["session_id"] == "sess_dash_01" and r["status"] == "success" for r in payload["rows"])
+    rows = [r for r in payload["rows"] if r["session_id"] == "sess_dash_01"]
+    assert len(rows) == 3
+
+    rollup_row = next(r for r in rows if r["agent_role"] == "root_rollup")
+    root_self_row = next(r for r in rows if r["agent_role"] == "root_self")
+    sub_row = next(r for r in rows if r["agent_role"] == "sub_agent")
+
+    assert rollup_row["root_agent_name"] == "coordinator_agent"
+    assert rollup_row["total_tokens"] == 2400
+    assert root_self_row["agent_name"] == "coordinator_agent"
+    assert root_self_row["root_agent_name"] == "coordinator_agent"
+    assert sub_row["agent_name"] == "research_agent"
+    assert sub_row["root_agent_name"] == "coordinator_agent"
+    assert sub_row["parent_agent_name"] == "coordinator_agent"
