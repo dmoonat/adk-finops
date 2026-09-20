@@ -61,6 +61,7 @@ class FinOpsCostPlugin(BasePlugin):
         on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
         fallback_model: str = "gemini-2.5-flash",
         render_terminal_box: bool = True,
+        enable_optimization_advisor: bool = True,
         bigquery_table: str | None = None,
         bigquery_export_scope: str = "session",  # "session", "turn", or "both"
         bigquery_tags: dict[str, Any] | None = None,
@@ -91,6 +92,14 @@ class FinOpsCostPlugin(BasePlugin):
         self.on_budget_exceeded = on_budget_exceeded.lower()
         self.fallback_model = fallback_model
         self.render_terminal_box = render_terminal_box
+        env_advisor = os.getenv("ADK_FINOPS_OPTIMIZATION_ADVISOR", "").strip().lower()
+        if env_advisor in ("0", "false", "no", "off"):
+            self.enable_optimization_advisor = False
+        elif env_advisor in ("1", "true", "yes", "on"):
+            self.enable_optimization_advisor = True
+        else:
+            self.enable_optimization_advisor = bool(enable_optimization_advisor)
+        CostTracker.set_optimization_advisor_enabled(self.enable_optimization_advisor)
         self.bigquery_table = bigquery_table or os.getenv("ADK_FINOPS_BIGQUERY_TABLE")
         self.export_scope = (export_scope or bigquery_export_scope).lower()
         self.export_tags = export_tags if export_tags is not None else bigquery_tags
@@ -522,7 +531,10 @@ class FinOpsCostPlugin(BasePlugin):
             if self.render_terminal_box:
                 from .display import print_summary
 
-                print_summary(summary)
+                print_summary(
+                    summary,
+                    show_optimization_insights=self.enable_optimization_advisor,
+                )
 
             if self.exporters:
                 tags = dict(self.export_tags or {})

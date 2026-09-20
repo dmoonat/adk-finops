@@ -14,6 +14,7 @@
 
 """adk-finops: Universal LLM FinOps and Token Cost Tracking for Google ADK and Python agents."""
 
+from .advisor import ADVISOR_DISCLAIMER, generate_optimization_insights
 from .display import (
     format_plain_task_efficiency,
     format_summary_box,
@@ -69,6 +70,8 @@ __all__.extend(
         "OpenTelemetryExporter",
         "create_dashboard_app",
         "start_background_dashboard",
+        "generate_optimization_insights",
+        "ADVISOR_DISCLAIMER",
     ]
 )
 

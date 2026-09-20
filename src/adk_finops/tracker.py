@@ -63,6 +63,18 @@ class CostTracker:
     _global_budget: ClassVar[dict[str, float]] = {}
     _task_history: ClassVar[list[dict[str, Any]]] = []
     _agent_hierarchy: ClassVar[dict[str, dict[str, str | None]]] = {}
+    _optimization_advisor_enabled: ClassVar[bool] = True
+
+    @classmethod
+    def set_optimization_advisor_enabled(cls, enabled: bool) -> None:
+        """Enables or disables the Automated FinOps Optimization Advisor."""
+        with cls._lock:
+            cls._optimization_advisor_enabled = bool(enabled)
+
+    @classmethod
+    def is_optimization_advisor_enabled(cls) -> bool:
+        """Returns whether the Automated FinOps Optimization Advisor is enabled."""
+        return cls._optimization_advisor_enabled
 
     @classmethod
     def register_agent_hierarchy(
@@ -908,6 +920,28 @@ class CostTracker:
                 and turn_dict.get("total_cost_usd", 0.0) >= (cls.get_budget(effective_session).get("turn") or 0.0)
             ),
         }
+
+        # Automated FinOps Optimization Advisor (zero-LLM deterministic math)
+        if cls._optimization_advisor_enabled:
+            from .advisor import generate_optimization_insights
+
+            advisor_res = generate_optimization_insights(session_dict, cls._registry)
+            insights = advisor_res["insights"]
+            pot_savings = advisor_res["potential_savings_usd"]
+            pot_pct = advisor_res["potential_savings_pct"]
+        else:
+            insights = []
+            pot_savings = 0.0
+            pot_pct = 0.0
+
+        session_dict["optimization_insights"] = insights
+        session_dict["potential_savings_usd"] = pot_savings
+        session_dict["potential_savings_pct"] = pot_pct
+        result["optimization_insights"] = insights
+        result["potential_savings_usd"] = pot_savings
+        result["potential_savings_pct"] = pot_pct
+        result["recommendations"] = [item["message"] for item in insights]
+
         return result
 
     @classmethod

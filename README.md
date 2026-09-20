@@ -23,6 +23,7 @@
 - [Task Outcome & Wasted Spend Analytics (Success vs. Failure)](#task-outcome--wasted-spend-analytics-success-vs-failure)
 - [Context Caching Savings Analytics (ROI Tracker)](#context-caching-savings-analytics-roi-tracker)
 - [Multi-Agent Cost Attribution & Delegation Tracking](#multi-agent-cost-attribution--delegation-tracking)
+- [Automated FinOps Optimization Advisor](#automated-finops-optimization-advisor)
 - [Rich Terminal Summary Box](#rich-terminal-summary-box)
   - [Automatic & On-Demand Integration](#automatic--on-demand-integration)
 - [Decoupled Rate Cards (Custom & Enterprise Pricing)](#decoupled-rate-cards-custom--enterprise-pricing)
@@ -64,6 +65,7 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 - **Native Google ADK Integration**: Intercepts model and tool invocations via the ADK `BasePlugin` lifecycle (`before_run`, `after_model`, `on_event`, `after_tool`, `after_run`).
 - **Dual-Scope Accounting**: Simultaneously tracks metrics for both the **active turn** (all calls within a user message) and the **cumulative session** (entire conversation history).
 - **Budget Guards & Circuit Breakers**: Set hard session and turn USD spending limits. Prevent runaway bills by halting execution, emitting warnings, or automatically downgrading expensive models (e.g. Gemini 2.5 Pro → Flash) when limits are breached.
+- **Automated FinOps Optimization Advisor**: Zero-LLM, deterministic rule engine that analyzes completed session telemetry in `< 1ms` and calculates concrete `$` and `%` savings across **Context Caching Opportunities**, **Thinking Token Alerts** (`thinking_budget=0`), and **Model Right-Sizing** (`gemini-3.5-pro` ➔ `gemini-3.5-flash` ➔ `gemini-3.5-flash-lite`, `gemini-2.5-pro` ➔ `gemini-2.5-flash`, `gpt-4o` ➔ `gpt-4o-mini`). Easily toggled on/off via `enable_optimization_advisor=True/False`.
 - **Task Outcome & Wasted Spend Analytics**: Distinguishes productive spend (`status="success"`) from wasted capital burned on failed retry loops or runtime exceptions (`status="failed"`, `"error"`). Computes average spend per successful task vs. average wasted spend per failed loop, capital loss percentage, and auto-exports crashed sessions to BigQuery.
 - **Context Caching Savings ROI**: Demonstrates financial value by tracking gross cost (cost without caching) vs. actual net cost, reporting exact dollars and percentage saved (e.g. up to 90% savings via Gemini Context Caching).
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
@@ -437,16 +439,71 @@ Every turn and session summary includes this hierarchy inside `breakdown_by_agen
 │  gemini-2.5-pro         1       1,200 / 300      $0.0030                 —   │
 │  gemini-2.5-flash       1       8,000 / 600      $0.0023   $0.0016 (41.5%)   │
 │                                                                              │
-│  Agent           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
-│  ──────────────────────────────────────────────────────────────────          │
-│  🤖 supervisor       1    1,500    $0.0030       $0.00      $0.0030          │
-│  🤖 researcher       1    8,600    $0.0023     $0.0280      $0.0303          │
+│  Agent             Calls   Tokens   LLM Cost   Tool Fees   Total Cost        │
+│  ────────────────────────────────────────────────────────────────────        │
+│  🤖 researcher         4   14,400    $0.0078       $0.00      $0.0078        │
+│  🤖 router_agent       1    5,900    $0.0130       $0.00      $0.0130        │
+│  🤖 formatter          1    1,610    $0.0024       $0.00      $0.0024        │
 │                                                                              │
-│  🛡️  Budget Guard: $0.0333 / $1.0000 (3.3% utilized)                         │
+│  🛡️  Budget Guard: $0.0233 / $1.0000 (2.3% utilized)                         │
+│                                                                              │
+│  💡 Optimization Insights (Est. Savings: $0.0148 | 63.6% cut available)      │
+│   ⚡ Context Caching Opportunity: Agent 'researcher' sent >12k uncached      │
+│ prompt tokens across 4 turns. Enabling Context Caching would save $0.0026    │
+│ (90%).                                                                       │
+│   🧠 Thinking Token Alert: Thinking tokens (4,200) were 82% of               │
+│ 'router_agent' output cost ($0.0105); consider setting thinking_budget=0.    │
+│   🎯 Model Right-Sizing: Agent 'formatter' used gemini-2.5-pro for <150      │
+│ output tokens with 0 tool calls; switching to gemini-2.5-flash saves 70%     │
+│ ($0.0017).                                                                   │
+│   ℹ️  Disclaimer: Insights are deterministic hints; validate against your    │
+│ use-case, eval data & business requirements.                                 │
 ╰───────────────── adk-finops • Universal Token & Cost Engine ─────────────────╯
 ```
 
-### Features
+---
+
+## Automated FinOps Optimization Advisor
+
+Beyond raw telemetry, `adk-finops` includes an **Automated FinOps Optimization Advisor** (`src/adk_finops/advisor.py`) that analyzes completed sessions in `< 1ms` with **zero LLM calls** and **\$0.00 overhead**, computing concrete dollar and percentage savings directly from your active [`RateCardRegistry`](src/adk_finops/rate_card.py):
+
+1. **⚡ Context Caching Opportunity**:
+   - Detects agents sending $\ge 2,000$ uncached prompt tokens across $\ge 2$ turns and calculates exact savings from enabling Context Caching (`cached_input_per_1m` vs. `input_per_1m`).
+2. **🧠 Thinking Token Alert**:
+   - Detects agents where `thoughts_tokens >= 500` account for $\ge 60\%$ of total output token cost, recommending `thinking_budget=0` (or a lower `ThinkingConfig` cap) for routing/classification steps.
+3. **🎯 Model Right-Sizing**:
+   - Detects agents using flagship models (`gemini-3.5-pro` $\rightarrow$ `gemini-3.5-flash` $\rightarrow$ `gemini-3.5-flash-lite`, `gemini-2.5-pro` $\rightarrow$ `gemini-2.5-flash`, `gpt-4o` $\rightarrow$ `gpt-4o-mini`, `claude-3-5-sonnet` $\rightarrow$ `claude-3-5-haiku`) for short responses (`< 200` average output tokens) with `0` tool calls, calculating exact savings from switching to the lighter tier.
+
+### Enabling or Disabling the Optimization Advisor
+
+The advisor is **enabled by default** and can be toggled on or off in `FinOpsCostPlugin`:
+
+```python
+from adk_finops import FinOpsCostPlugin
+
+# Enabled by default (renders in Terminal Box & attaches to get_summary()['optimization_insights'])
+finops_plugin = FinOpsCostPlugin(
+    enable_optimization_advisor=True,
+)
+
+# Disable the advisor if you only want raw telemetry
+finops_plugin = FinOpsCostPlugin(
+    enable_optimization_advisor=False,
+)
+```
+
+Or toggle globally via environment variable:
+```bash
+export ADK_FINOPS_OPTIMIZATION_ADVISOR="false"
+```
+
+> [!IMPORTANT]
+> **Disclaimer — Directional Hints Only**:
+> Optimization insights are generated using **deterministic heuristics and token-level rules** (with zero LLM evaluation of prompt semantics). They should be treated as **directional hints** rather than fully dependable or prescriptive actions. Before changing models, enabling caching, or lowering `thinking_budget` in production, always perform a **deep analysis of your specific use-case, offline/online evaluation datasets (`eval` data), accuracy benchmarks, latency SLAs, and business requirements**.
+
+---
+
+### Terminal Box Features
 
 - **Rich 24-Bit Color Styling**: When [`rich`](https://github.com/Textualize/rich) is installed (`pip install "adk-finops[rich]"`), it renders full color highlights, styled headers, and rounded boxes.
 - **Pure-Python Unicode Fallback**: If `rich` is not installed, it falls back seamlessly to an aligned pure-Python Unicode box drawing (`╭─╮│╰─╯`) with zero external dependencies.
@@ -465,10 +522,11 @@ from google.adk.agents import Agent
 from google.adk.apps import App
 from adk_finops import FinOpsCostPlugin
 
-# Automatically renders the Rich box at the end of each turn
+# Automatically renders the Rich box and Optimization Advisor at the end of each turn
 finops_plugin = FinOpsCostPlugin(
     default_model="gemini-2.5-pro",
-    render_terminal_box=True,  # Enabled by default
+    render_terminal_box=True,          # Enabled by default
+    enable_optimization_advisor=True,  # Enabled by default
 )
 
 app = App(
@@ -649,6 +707,7 @@ print(f"Total Tokens: {summary['total_tokens']}")
 | :--- | :--- | :--- |
 | `ADK_FINOPS_RATE_CARD_PATH` | `str` | Absolute or relative path to a custom JSON rate card file. |
 | `ADK_FINOPS_DISCOUNT_PERCENT` | `float` | Global enterprise discount percentage (e.g., `15.0` for 15%). |
+| `ADK_FINOPS_OPTIMIZATION_ADVISOR` | `bool` | Toggle the Automated FinOps Optimization Advisor (`"true"` or `"false"`). |
 
 ### Plugin Initialization Parameters
 
@@ -664,6 +723,8 @@ FinOpsCostPlugin(
     agent_budgets: dict[str, float] | None = None,
     on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
     fallback_model: str = "gemini-2.5-flash",
+    render_terminal_box: bool = True,
+    enable_optimization_advisor: bool = True,
 )
 ```
 
@@ -678,6 +739,7 @@ FinOpsCostPlugin(
 | `on_budget_exceeded` | `str` | `"halt"` | Action on budget breach: `"halt"` (raise/block), `"warn"`, or `"downgrade"`. |
 | `fallback_model` | `str` | `"gemini-2.5-flash"` | Target model when using `"downgrade"` mode. |
 | `render_terminal_box` | `bool` | `True` | Renders a beautiful color-coded summary box to stdout at the end of each turn. |
+| `enable_optimization_advisor` | `bool` | `True` | Enables deterministic FinOps Optimization Insights in the summary box and `get_summary()`. |
 
 ---
 
@@ -688,6 +750,7 @@ The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) cont
 | Model | Provider | Input / 1M | Output / 1M | Cached / 1M | Context >128k Tier |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | `gemini-3.8-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
+| `gemini-3.5-flash` | Google | \$1.50 | \$9.00 | \$0.15 | — |
 | `gemini-3.7-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
 | `gemini-3.6-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
 | `codemender` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |

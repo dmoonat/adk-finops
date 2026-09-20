@@ -55,7 +55,46 @@ def _format_usd(amount: float) -> str:
     return f"${amount:.4f}"
 
 
-def render_rich_summary(summary: dict[str, Any], console: Console | None = None) -> Panel:
+def _resolve_optimization_insights(
+    summary: dict[str, Any],
+    show_optimization_insights: bool | None = None,
+) -> tuple[list[dict[str, Any]], float, float]:
+    """Resolves optimization insights for a summary if the advisor is enabled."""
+    if show_optimization_insights is None:
+        from .tracker import CostTracker
+
+        show_optimization_insights = CostTracker.is_optimization_advisor_enabled()
+    if not show_optimization_insights:
+        return [], 0.0, 0.0
+
+    sess_info = summary.get("session", summary)
+    insights = sess_info.get("optimization_insights")
+    if insights is None:
+        insights = summary.get("optimization_insights")
+    pot_usd = sess_info.get("potential_savings_usd")
+    if pot_usd is None:
+        pot_usd = summary.get("potential_savings_usd", 0.0)
+    pot_pct = sess_info.get("potential_savings_pct")
+    if pot_pct is None:
+        pot_pct = summary.get("potential_savings_pct", 0.0)
+
+    if insights is None:
+        from .advisor import generate_optimization_insights
+        from .tracker import CostTracker
+
+        res = generate_optimization_insights(sess_info, CostTracker.get_registry())
+        insights = res["insights"]
+        pot_usd = res["potential_savings_usd"]
+        pot_pct = res["potential_savings_pct"]
+
+    return list(insights or []), float(pot_usd or 0.0), float(pot_pct or 0.0)
+
+
+def render_rich_summary(
+    summary: dict[str, Any],
+    console: Console | None = None,
+    show_optimization_insights: bool | None = None,
+) -> Panel:
     """Creates a Rich Panel containing formatted tables for the FinOps summary."""
     sess_info = summary.get("session", summary)
     turn_info = summary.get("turn", {})
@@ -190,6 +229,39 @@ def render_rich_summary(summary: dict[str, Any], console: Console | None = None)
             b_text.append(f"{_format_usd(b_curr)} / {_format_usd(b_limit)} ({b_pct:.1f}% utilized)", style=b_color)
         render_items.append(b_text)
 
+    # --- 6. Automated FinOps Optimization Advisor ---
+    insights, pot_usd, pot_pct = _resolve_optimization_insights(summary, show_optimization_insights)
+    if insights:
+        icon_map = {
+            "context_caching": "⚡",
+            "thinking_budget": "🧠",
+            "model_right_sizing": "🎯",
+        }
+        advisor_header = Text()
+        advisor_header.append("\n 💡 Optimization Insights ", style="bold yellow")
+        if pot_usd > 0:
+            advisor_header.append(
+                f"(Est. Savings: {_format_usd(pot_usd)} | {pot_pct:.1f}% cut available)",
+                style="bold green",
+            )
+        render_items.append(advisor_header)
+
+        for item in insights:
+            cat = item.get("category", "")
+            icon = icon_map.get(cat, "•")
+            msg = item.get("message", "")
+            row_text = Text()
+            row_text.append(f"  {icon} ", style="bold cyan")
+            row_text.append(msg, style="white")
+            render_items.append(row_text)
+
+        disclaimer_text = Text()
+        disclaimer_text.append(
+            "  ℹ️  Disclaimer: Insights are deterministic hints; validate against your use-case, eval data & business requirements.",
+            style="dim italic",
+        )
+        render_items.append(disclaimer_text)
+
     panel = Panel(
         Group(*render_items),
         title="[bold cyan]💸 ADK FinOps Cost Summary[/bold cyan]",
@@ -286,8 +358,13 @@ def render_task_efficiency_table(metrics: dict[str, Any], console: Console | Non
     return panel
 
 
-def format_plain_summary_box(summary: dict[str, Any]) -> str:
+def format_plain_summary_box(
+    summary: dict[str, Any],
+    show_optimization_insights: bool | None = None,
+) -> str:
     """Pure-Python Unicode box fallback when 'rich' is not available."""
+    import textwrap
+
     sess_info = summary.get("session", summary)
     turn_info = summary.get("turn", {})
     budget_info = summary.get("budget", sess_info.get("budget", {}))
@@ -356,6 +433,24 @@ def format_plain_summary_box(summary: dict[str, Any]) -> str:
             line_content = f"   • {m_name}: {m_cost} ({m_tok} tokens, {m_data.get('calls', 0)} calls)"
             lines.append(f"│  {line_content:<72}│")
 
+    # Automated FinOps Optimization Advisor
+    insights, pot_usd, pot_pct = _resolve_optimization_insights(summary, show_optimization_insights)
+    if insights:
+        lines.append("├" + "─" * (width - 2) + "┤")
+        header_txt = (
+            f"💡 Optimization Insights (Est. Savings: {_format_usd(pot_usd)} | {pot_pct:.1f}% cut)"
+            if pot_usd > 0
+            else "💡 Optimization Insights:"
+        )
+        lines.append(f"│  {header_txt:<70}│")
+        for item in insights:
+            msg = f"• {item.get('message', '')}"
+            for wrapped in textwrap.wrap(msg, width=70, subsequent_indent="  "):
+                lines.append(f"│  {wrapped:<72}│")
+        disc_msg = "ℹ️ Disclaimer: Deterministic hints only; validate with use-case, eval data & business requirements."
+        for wrapped in textwrap.wrap(disc_msg, width=70, subsequent_indent="   "):
+            lines.append(f"│  {wrapped:<72}│")
+
     lines.append("╰" + "─" * (width - 2) + "╯")
     return "\n".join(lines)
 
@@ -408,14 +503,24 @@ def format_plain_task_efficiency(metrics: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def format_summary_box(summary: dict[str, Any]) -> str:
+def format_summary_box(
+    summary: dict[str, Any],
+    show_optimization_insights: bool | None = None,
+) -> str:
     """Formats the summary as a string box (Rich ANSI or Unicode plain text)."""
     if HAS_RICH:
         console = Console(record=True, width=80)
-        panel = render_rich_summary(summary, console=console)
+        panel = render_rich_summary(
+            summary,
+            console=console,
+            show_optimization_insights=show_optimization_insights,
+        )
         console.print(panel)
         return console.export_text(clear=True)
-    return format_plain_summary_box(summary)
+    return format_plain_summary_box(
+        summary,
+        show_optimization_insights=show_optimization_insights,
+    )
 
 
 def print_summary(
@@ -423,6 +528,7 @@ def print_summary(
     run_id: str | None = None,
     session_id: str | None = None,
     console: Console | None = None,
+    show_optimization_insights: bool | None = None,
 ) -> None:
     """Prints a beautiful summary box to the terminal using Rich or Unicode fallback."""
     if summary is None:
@@ -435,10 +541,19 @@ def print_summary(
 
     if HAS_RICH:
         c = console or Console()
-        panel = render_rich_summary(summary, console=c)
+        panel = render_rich_summary(
+            summary,
+            console=c,
+            show_optimization_insights=show_optimization_insights,
+        )
         c.print(panel)
     else:
-        print(format_plain_summary_box(summary))
+        print(
+            format_plain_summary_box(
+                summary,
+                show_optimization_insights=show_optimization_insights,
+            )
+        )
 
 
 def print_task_efficiency_summary(
