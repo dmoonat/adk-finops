@@ -65,7 +65,7 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 - **Native Google ADK Integration**: Intercepts model and tool invocations via the ADK `BasePlugin` lifecycle (`before_run`, `after_model`, `on_event`, `after_tool`, `after_run`).
 - **Dual-Scope Accounting**: Simultaneously tracks metrics for both the **active turn** (all calls within a user message) and the **cumulative session** (entire conversation history).
 - **Budget Guards & Circuit Breakers**: Set hard session and turn USD spending limits. Prevent runaway bills by halting execution, emitting warnings, or automatically downgrading expensive models (e.g. Gemini 2.5 Pro → Flash) when limits are breached.
-- **Automated FinOps Optimization Advisor**: Zero-LLM, deterministic rule engine that analyzes completed session telemetry in `< 1ms` and calculates concrete `$` and `%` savings across **Context Caching Opportunities**, **Thinking Token Alerts** (`thinking_budget=0`), and **Model Right-Sizing** (`gemini-3.5-pro` ➔ `gemini-3.5-flash` ➔ `gemini-3.5-flash-lite`, `gemini-2.5-pro` ➔ `gemini-2.5-flash`, `gpt-4o` ➔ `gpt-4o-mini`). Easily toggled on/off via `enable_optimization_advisor=True/False`.
+- **Automated FinOps Optimization Advisor**: Zero-LLM, deterministic rule engine that analyzes completed session telemetry in `< 1ms` and calculates concrete `$` and `%` savings across **Context Caching Opportunities**, **Thinking Token Alerts** (`thinking_budget=0`), and **Model Right-Sizing** (`gemini-3.5-flash` ➔ `gemini-3.5-flash-lite`, `gemini-2.5-pro` ➔ `gemini-2.5-flash`, `gpt-4o` ➔ `gpt-4o-mini`). Easily toggled on/off via `enable_optimization_advisor=True/False`.
 - **Task Outcome & Wasted Spend Analytics**: Distinguishes productive spend (`status="success"`) from wasted capital burned on failed retry loops or runtime exceptions (`status="failed"`, `"error"`). Computes average spend per successful task vs. average wasted spend per failed loop, capital loss percentage, and auto-exports crashed sessions to BigQuery.
 - **Context Caching Savings ROI**: Demonstrates financial value by tracking gross cost (cost without caching) vs. actual net cost, reporting exact dollars and percentage saved (e.g. up to 90% savings via Gemini Context Caching).
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
@@ -94,14 +94,14 @@ pip install "adk-finops[rich]"
 pip install "adk-finops[bigquery]"
 ```
 
-### Full Enterprise Suite (ADK + Rich + BigQuery)
-```bash
-pip install "adk-finops[all]"
-```
-
 ### With Google ADK
 ```bash
 pip install "adk-finops[adk]"
+```
+
+### Full Enterprise Suite (ADK + Rich + BigQuery)
+```bash
+pip install "adk-finops[all]"
 ```
 
 ### From GitHub (Direct Git Dependency)
@@ -420,6 +420,46 @@ Every turn and session summary includes this hierarchy inside `breakdown_by_agen
 
 ---
 
+## Automated FinOps Optimization Advisor
+
+Beyond raw telemetry, `adk-finops` includes an **Automated FinOps Optimization Advisor** (`src/adk_finops/advisor.py`) that analyzes completed sessions in `< 1ms` with **zero LLM calls** and **\$0.00 overhead**, computing concrete dollar and percentage savings directly from your active [`RateCardRegistry`](src/adk_finops/rate_card.py):
+
+1. **⚡ Context Caching Opportunity**:
+   - Detects agents sending $\ge 2,000$ uncached prompt tokens across $\ge 2$ turns and calculates exact savings from enabling Context Caching (`cached_input_per_1m` vs. `input_per_1m`).
+2. **🧠 Thinking Token Alert**:
+   - Detects agents where `thoughts_tokens >= 500` account for $\ge 60\%$ of total output token cost, recommending `thinking_budget=0` (or a lower `ThinkingConfig` cap) for routing/classification steps.
+3. **🎯 Model Right-Sizing**:
+   - Detects agents using flagship models (`gemini-3.5-pro` $\rightarrow$ `gemini-3.5-flash` $\rightarrow$ `gemini-3.5-flash-lite`, `gemini-2.5-pro` $\rightarrow$ `gemini-2.5-flash`, `gpt-4o` $\rightarrow$ `gpt-4o-mini`, `claude-3-5-sonnet` $\rightarrow$ `claude-3-5-haiku`) for short responses (`< 200` average output tokens) with `0` tool calls, calculating exact savings from switching to the lighter tier.
+
+### Enabling or Disabling the Optimization Advisor
+
+The advisor is **enabled by default** and can be toggled on or off in `FinOpsCostPlugin`:
+
+```python
+from adk_finops import FinOpsCostPlugin
+
+# Enabled by default (renders in Terminal Box & attaches to get_summary()['optimization_insights'])
+finops_plugin = FinOpsCostPlugin(
+    enable_optimization_advisor=True,
+)
+
+# Disable the advisor if you only want raw telemetry
+finops_plugin = FinOpsCostPlugin(
+    enable_optimization_advisor=False,
+)
+```
+
+Or toggle globally via environment variable:
+```bash
+export ADK_FINOPS_OPTIMIZATION_ADVISOR="false"
+```
+
+> [!IMPORTANT]
+> **Disclaimer — Directional Hints Only**:
+> Optimization insights are generated using **deterministic heuristics and token-level rules** (with zero LLM evaluation of prompt semantics). They should be treated as **directional hints** rather than fully dependable or prescriptive actions. Before changing models, enabling caching, or lowering `thinking_budget` in production, always perform a **deep analysis of your specific use-case, offline/online evaluation datasets (`eval` data), accuracy benchmarks, latency SLAs, and business requirements**.
+
+---
+
 ## Rich Terminal Summary Box
 
 `adk-finops` includes an out-of-the-box, color-coded, border-styled terminal summary box. When running in a terminal, it provides instant financial visibility after every turn, displaying turn vs. session costs, context caching ROI, model breakdowns, and sub-agent attributions:
@@ -460,46 +500,6 @@ Every turn and session summary includes this hierarchy inside `breakdown_by_agen
 │ use-case, eval data & business requirements.                                 │
 ╰───────────────── adk-finops • Universal Token & Cost Engine ─────────────────╯
 ```
-
----
-
-## Automated FinOps Optimization Advisor
-
-Beyond raw telemetry, `adk-finops` includes an **Automated FinOps Optimization Advisor** (`src/adk_finops/advisor.py`) that analyzes completed sessions in `< 1ms` with **zero LLM calls** and **\$0.00 overhead**, computing concrete dollar and percentage savings directly from your active [`RateCardRegistry`](src/adk_finops/rate_card.py):
-
-1. **⚡ Context Caching Opportunity**:
-   - Detects agents sending $\ge 2,000$ uncached prompt tokens across $\ge 2$ turns and calculates exact savings from enabling Context Caching (`cached_input_per_1m` vs. `input_per_1m`).
-2. **🧠 Thinking Token Alert**:
-   - Detects agents where `thoughts_tokens >= 500` account for $\ge 60\%$ of total output token cost, recommending `thinking_budget=0` (or a lower `ThinkingConfig` cap) for routing/classification steps.
-3. **🎯 Model Right-Sizing**:
-   - Detects agents using flagship models (`gemini-3.5-pro` $\rightarrow$ `gemini-3.5-flash` $\rightarrow$ `gemini-3.5-flash-lite`, `gemini-2.5-pro` $\rightarrow$ `gemini-2.5-flash`, `gpt-4o` $\rightarrow$ `gpt-4o-mini`, `claude-3-5-sonnet` $\rightarrow$ `claude-3-5-haiku`) for short responses (`< 200` average output tokens) with `0` tool calls, calculating exact savings from switching to the lighter tier.
-
-### Enabling or Disabling the Optimization Advisor
-
-The advisor is **enabled by default** and can be toggled on or off in `FinOpsCostPlugin`:
-
-```python
-from adk_finops import FinOpsCostPlugin
-
-# Enabled by default (renders in Terminal Box & attaches to get_summary()['optimization_insights'])
-finops_plugin = FinOpsCostPlugin(
-    enable_optimization_advisor=True,
-)
-
-# Disable the advisor if you only want raw telemetry
-finops_plugin = FinOpsCostPlugin(
-    enable_optimization_advisor=False,
-)
-```
-
-Or toggle globally via environment variable:
-```bash
-export ADK_FINOPS_OPTIMIZATION_ADVISOR="false"
-```
-
-> [!IMPORTANT]
-> **Disclaimer — Directional Hints Only**:
-> Optimization insights are generated using **deterministic heuristics and token-level rules** (with zero LLM evaluation of prompt semantics). They should be treated as **directional hints** rather than fully dependable or prescriptive actions. Before changing models, enabling caching, or lowering `thinking_budget` in production, always perform a **deep analysis of your specific use-case, offline/online evaluation datasets (`eval` data), accuracy benchmarks, latency SLAs, and business requirements**.
 
 ---
 
