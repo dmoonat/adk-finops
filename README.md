@@ -622,13 +622,16 @@ export ADK_FINOPS_DISCOUNT_PERCENT="15.0"
 ```
 
 ### 5. Programmatic Model & Tool Registration
+If a model is not present in the bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json), `adk-finops` applies the default fallback rate (`$0.30 / $2.50 / $0.03` per 1M tokens), sets `"is_fallback_rate": True` on the recorded usage/summary, and logs a one-time warning prompting you to register the model's exact pricing via `CostTracker.register_rate_card`:
+
 ```python
 from adk_finops import CostTracker
 
-CostTracker.register_rate_card("my-internal-model", {
-    "provider": "internal",
-    "input_per_1m": 0.40,
-    "output_per_1m": 1.60,
+CostTracker.register_rate_card("claude-opus-5", {
+    "provider": "anthropic",
+    "input_per_1m": 5.00,
+    "output_per_1m": 25.00,
+    "cached_input_per_1m": 0.50,
 })
 
 CostTracker.register_tool_rate("internal_vector_db", 0.0005)

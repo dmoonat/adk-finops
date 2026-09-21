@@ -172,4 +172,39 @@ def test_gt_200k_rate_card_and_cost_calculation() -> None:
     assert net_over == 1.00
 
 
+def test_unrecognized_model_logs_warning_and_marks_fallback_rate(capsys) -> None:
+    """Verifies Issue #1: unrecognized models log a warning requesting CostTracker.register_rate_card and set is_fallback_rate=True."""
+    from adk_finops import CostTracker
+
+    reg = RateCardRegistry()
+    rate = reg.resolve_model("acme-llm-7b")
+    assert rate.is_fallback is True
+    captured = capsys.readouterr().out
+    assert "Model 'acme-llm-7b' is not in the default rate card" in captured
+    assert "CostTracker.register_rate_card('acme-llm-7b'" in captured
+
+    rec = CostTracker.record_usage(
+        run_id="run-acme",
+        model_name="acme-llm-7b",
+        prompt_tokens=1_000_000,
+        completion_tokens=100_000,
+    )
+    assert rec["is_fallback_rate"] is True
+
+    # Once registered via CostTracker.register_rate_card, is_fallback_rate becomes False
+    CostTracker.register_rate_card(
+        "acme-llm-7b",
+        {"provider": "acme", "input_per_1m": 1.0, "output_per_1m": 5.0, "cached_input_per_1m": 0.1},
+    )
+    rec_registered = CostTracker.record_usage(
+        run_id="run-acme-2",
+        model_name="acme-llm-7b",
+        prompt_tokens=1_000_000,
+        completion_tokens=100_000,
+    )
+    assert rec_registered["is_fallback_rate"] is False
+    assert rec_registered["cost_usd"] == 1.50
+
+
+
 

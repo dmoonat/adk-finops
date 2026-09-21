@@ -346,10 +346,15 @@ class FinOpsCostPlugin(BasePlugin):
             except Exception:
                 pass
 
+            fallback_str = (
+                " | ⚠️ [FALLBACK RATE - register via CostTracker.register_rate_card()]"
+                if record.get("is_fallback_rate")
+                else ""
+            )
             msg = (
                 f"[FinOps LLM] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} model={model_name} "
                 f"tokens={record.get('total_tokens')} (prompt={prompt_tokens}, completion={completion_tokens}, thoughts={thoughts_tokens}, cached={cached_tokens}) "
-                f"cost=${record.get('cost_usd', 0.0):.6f}{savings_str}"
+                f"cost=${record.get('cost_usd', 0.0):.6f}{savings_str}{fallback_str}"
             )
             print(msg, flush=True)
             logger.info(msg)

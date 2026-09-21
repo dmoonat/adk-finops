@@ -68,6 +68,7 @@ class ModelRate:
     input_per_1m_gt_128k: float | None = None
     output_per_1m_gt_128k: float | None = None
     cached_input_per_1m_gt_128k: float | None = None
+    is_fallback: bool = False
 
     @classmethod
     def from_dict(
@@ -75,6 +76,7 @@ class ModelRate:
         data: dict[str, Any],
         region: str | None = None,
         effective_date: Any = None,
+        is_fallback: bool = False,
     ) -> ModelRate:
         """Creates a ModelRate from a raw dictionary, respecting region and transition dates."""
         from datetime import date
@@ -134,6 +136,7 @@ class ModelRate:
             input_per_1m_gt_128k=float(in_gt_128k) if in_gt_128k is not None else None,
             output_per_1m_gt_128k=float(out_gt_128k) if out_gt_128k is not None else None,
             cached_input_per_1m_gt_128k=float(cached_gt_128k) if cached_gt_128k is not None else None,
+            is_fallback=bool(effective_data.get("is_fallback", is_fallback)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -154,7 +157,8 @@ class RateCardRegistry:
         self._raw_models: dict[str, dict[str, Any]] = {}
         self._models: dict[str, ModelRate] = {}
         self._tools: dict[str, float] = {}
-        self._fallback: ModelRate = ModelRate()
+        self._fallback: ModelRate = ModelRate(is_fallback=True)
+        self._warned_fallback_models: set[str] = set()
         self._provider_discounts: dict[str, float] = {}  # provider -> discount multiplier (e.g. 0.85)
         self._global_discount: float = 1.0  # multiplier (1.0 = no discount)
         self._explicit_region: str | None = region.strip().lower() if region else None
@@ -238,6 +242,7 @@ class RateCardRegistry:
                     region=self._region,
                     effective_date=self._effective_date,
                 )
+                self._warned_fallback_models.discard(clean_name)
 
             # Tools
             tools_data = data.get("tools", {})
@@ -250,6 +255,7 @@ class RateCardRegistry:
                     data["fallback"],
                     region=self._region,
                     effective_date=self._effective_date,
+                    is_fallback=True,
                 )
 
     def load_from_file(self, file_path: str | Path) -> None:
@@ -278,9 +284,16 @@ class RateCardRegistry:
     def register_model(self, model_name: str, rate: ModelRate | dict[str, Any]) -> None:
         """Registers or overrides a single model rate card."""
         with self._lock:
+            clean = model_name.strip().lower()
             if isinstance(rate, dict):
-                rate = ModelRate.from_dict(rate)
-            self._models[model_name.strip().lower()] = rate
+                self._raw_models[clean] = dict(rate)
+                rate = ModelRate.from_dict(
+                    rate,
+                    region=self._region,
+                    effective_date=self._effective_date,
+                )
+            self._models[clean] = rate
+            self._warned_fallback_models.discard(clean)
 
     def register_tool(self, tool_name: str, cost_per_call_usd: float) -> None:
         """Registers or overrides a fixed fee per tool call."""
@@ -325,6 +338,20 @@ class RateCardRegistry:
             for key, rate in self._models.items():
                 if clean.startswith(key) or key in clean:
                     return rate
+
+            # 3. Unrecognized model -> warn once and return fallback rate card
+            if clean not in self._warned_fallback_models:
+                self._warned_fallback_models.add(clean)
+                warn_msg = (
+                    f"Model '{model_name}' is not in the default rate card; applying fallback pricing "
+                    f"(input=${self._fallback.input_per_1m}/1M, output=${self._fallback.output_per_1m}/1M, "
+                    f"cached=${self._fallback.cached_input_per_1m}/1M). "
+                    f"Please register exact rates for this model via: "
+                    f"CostTracker.register_rate_card('{model_name}', "
+                    f"{{'provider': '...', 'input_per_1m': ..., 'output_per_1m': ..., 'cached_input_per_1m': ...}})"
+                )
+                logger.warning(warn_msg)
+                print(f"⚠️ [FinOps Rate Card] {warn_msg}", flush=True)
 
             return self._fallback
 

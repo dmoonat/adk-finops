@@ -645,6 +645,8 @@ class CostTracker:
             return {}
 
         total_output_tokens = completion_tokens + thoughts_tokens
+        card = cls._registry.resolve_model(model_name)
+        is_fallback_rate = bool(getattr(card, "is_fallback", False))
         call_cost, gross_cost, savings = cls.calculate_call_cost_and_savings(
             model_name=model_name,
             prompt_tokens=prompt_tokens,
@@ -671,6 +673,8 @@ class CostTracker:
                 task_name=task_name,
                 agent_name=agent_name,
             )
+            if model_name in cls._active_runs[effective_id].get("breakdown_by_model", {}):
+                cls._active_runs[effective_id]["breakdown_by_model"][model_name]["is_fallback_rate"] = is_fallback_rate
 
             if session_id and session_id != effective_id:
                 if session_id not in cls._active_runs:
@@ -689,6 +693,8 @@ class CostTracker:
                     task_name=task_name,
                     agent_name=agent_name,
                 )
+                if model_name in cls._active_runs[session_id].get("breakdown_by_model", {}):
+                    cls._active_runs[session_id]["breakdown_by_model"][model_name]["is_fallback_rate"] = is_fallback_rate
 
         savings_pct = round((savings / gross_cost) * 100, 1) if gross_cost > 0 else 0.0
         return {
@@ -703,6 +709,7 @@ class CostTracker:
             "gross_cost_usd": gross_cost,
             "savings_usd": savings,
             "savings_pct": savings_pct,
+            "is_fallback_rate": is_fallback_rate,
         }
 
     @classmethod
