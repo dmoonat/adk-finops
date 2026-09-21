@@ -147,6 +147,8 @@ app = App(
 )
 ```
 
+> **⚠️ Note:** `FinOpsCostPlugin` is a native `App`/`Runner`-level `BasePlugin`. Register it **only** via `App(plugins=[finops_plugin])` (or `Runner(plugins=[finops_plugin])`) — do not also pass `plugin.after_model_callback` to `Agent(after_model_callback=...)`, or ADK will invoke the callback twice.
+
 Run your agent with `adk web` or `adk run`. Telemetry will log directly to the terminal and appear in the Web UI session state under `finops_cost`.
 
 ---
