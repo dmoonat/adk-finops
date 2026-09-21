@@ -112,6 +112,7 @@ class FinOpsCostPlugin(BasePlugin):
         self.bq_exporter = None
         self.exporters: list[Any] = list(exporters) if exporters else []
         self._exported_sessions: set[str] = set()
+        self._last_partial_usage: dict[str, tuple[Any, str | None]] = {}
 
         if self.bigquery_table:
             from .exporters.bigquery import BigQueryExporter
@@ -305,9 +306,27 @@ class FinOpsCostPlugin(BasePlugin):
         """Intercepts Gemini LLM responses to record token usage, cost, and budget limits."""
         turn_id, session_id = self._extract_ids(callback_context)
         agent_name = self._extract_agent_name(callback_context)
+        partial_key = f"{turn_id}:{agent_name}"
 
         usage = getattr(llm_response, "usage_metadata", None)
-        model_name = getattr(llm_response, "model_version", None) or self.default_model
+        model_version = getattr(llm_response, "model_version", None)
+
+        # In SSE / live streaming mode, ADK calls after_model_callback once per streamed
+        # partial chunk (llm_response.partial == True) with cumulative usage_metadata,
+        # followed by one final aggregated LlmResponse (partial == False / None).
+        # Skip partial chunks so a streamed model call is recorded only once.
+        if getattr(llm_response, "partial", None) is True:
+            if usage is not None:
+                self._last_partial_usage[partial_key] = (usage, model_version)
+            return None
+
+        partial_fallback = self._last_partial_usage.pop(partial_key, None)
+        if usage is None and partial_fallback is not None:
+            usage, fallback_model_ver = partial_fallback
+            if not model_version:
+                model_version = fallback_model_ver
+
+        model_name = model_version or self.default_model
 
         if usage:
             prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
@@ -392,6 +411,9 @@ class FinOpsCostPlugin(BasePlugin):
         self, *, invocation_context: InvocationContext, event: Any
     ) -> Any | None:
         """Attaches FinOps cost metrics (both turn and session) to event state_delta so ADK Web UI updates session state in real-time."""
+        if getattr(event, "partial", None) is True:
+            return event
+
         turn_id, session_id = self._extract_ids(invocation_context)
 
         summary = CostTracker.get_summary(run_id=turn_id, session_id=session_id, pop=False)
@@ -464,6 +486,23 @@ class FinOpsCostPlugin(BasePlugin):
     ) -> None:
         """Gathers cumulative FinOps summary and persists it into ADK session state."""
         turn_id, session_id = self._extract_ids(invocation_context)
+
+        # Flush any leftover partial streaming usage if a stream terminated without a final non-partial chunk
+        prefix = f"{turn_id}:"
+        for k in [k for k in self._last_partial_usage if k.startswith(prefix)]:
+            usage, model_version = self._last_partial_usage.pop(k)
+            agent_name = k[len(prefix) :] or "root_agent"
+            CostTracker.record_usage(
+                run_id=turn_id,
+                session_id=session_id,
+                model_name=model_version or self.default_model,
+                prompt_tokens=getattr(usage, "prompt_token_count", 0) or 0,
+                completion_tokens=getattr(usage, "candidates_token_count", 0) or 0,
+                thoughts_tokens=getattr(usage, "thoughts_token_count", 0) or 0,
+                cached_tokens=getattr(usage, "cached_content_token_count", 0) or 0,
+                task_name=agent_name,
+                agent_name=agent_name,
+            )
 
         # Auto-detect task status from session state if set by workflow nodes/critics
         if hasattr(invocation_context, "session") and invocation_context.session:

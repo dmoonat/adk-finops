@@ -175,3 +175,50 @@ async def test_plugin_multi_agent_attribution_and_halt():
     except BudgetExceededError as e:
         assert "runaway_agent" in str(e)
         assert e.scope == "agent"
+
+
+def test_streaming_partial_llm_responses_not_double_counted():
+    """Verify SSE streaming partial=True chunks are skipped and only the final response is recorded (#3)."""
+    import asyncio
+
+    async def _run():
+        CostTracker.reset()
+        plugin = FinOpsCostPlugin(default_model="gemini-2.5-flash", render_terminal_box=False)
+
+        callback_context = MagicMock()
+        callback_context.invocation_id = "stream_turn_1"
+        callback_context.session.id = "stream_sess_1"
+        callback_context.agent_name = "root_agent"
+
+        CostTracker.start_turn(turn_id="stream_turn_1", session_id="stream_sess_1")
+
+        # Simulate 6 partial streaming chunks (partial=True) with cumulative token counts
+        for partial_out in [4, 22, 71, 120, 168, 205]:
+            chunk = MagicMock()
+            chunk.partial = True
+            chunk.model_version = "gemini-2.5-flash"
+            chunk.usage_metadata.prompt_token_count = 38
+            chunk.usage_metadata.candidates_token_count = partial_out
+            chunk.usage_metadata.thoughts_token_count = 0
+            chunk.usage_metadata.cached_content_token_count = 0
+            await plugin.after_model_callback(callback_context=callback_context, llm_response=chunk)
+
+        # Final aggregated response (partial=False)
+        final_resp = MagicMock()
+        final_resp.partial = False
+        final_resp.model_version = "gemini-2.5-flash"
+        final_resp.usage_metadata.prompt_token_count = 38
+        final_resp.usage_metadata.candidates_token_count = 205
+        final_resp.usage_metadata.thoughts_token_count = 0
+        final_resp.usage_metadata.cached_content_token_count = 0
+        await plugin.after_model_callback(callback_context=callback_context, llm_response=final_resp)
+
+        summary = CostTracker.get_summary(run_id="stream_turn_1", session_id="stream_sess_1")
+        sess = summary["session"]
+        assert sess["prompt_tokens"] == 38
+        assert sess["completion_tokens"] == 205
+        assert sess["total_tokens"] == 243
+        assert abs(sess["total_cost_usd"] - 0.0005239) < 1e-7
+
+    asyncio.run(_run())
+
