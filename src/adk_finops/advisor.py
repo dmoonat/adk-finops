@@ -35,6 +35,11 @@ ADVISOR_DISCLAIMER: str = (
 
 # Flagship/reasoning models mapped to their cost-effective right-sized targets
 RIGHT_SIZE_MODEL_MAP: dict[str, str] = {
+    "gemini-3.1-pro-preview": "gemini-3.7-flash",
+    "gemini-3.1-pro": "gemini-3.7-flash",
+    "gemini-3.8-flash": "gemini-3.1-flash-lite",
+    "gemini-3.7-flash": "gemini-3.1-flash-lite",
+    "gemini-3.6-flash": "gemini-3.1-flash-lite",
     "gemini-3.5-flash": "gemini-3.5-flash-lite",
     "gemini-2.5-pro": "gemini-2.5-flash",
     "gpt-4o": "gpt-4o-mini",
@@ -134,9 +139,14 @@ def generate_optimization_insights(
         # ------------------------------------------------------------------
         # 1. Context Caching Opportunity
         # ------------------------------------------------------------------
+        use_gt_200k = avg_prompt_per_call > 200_000 and rate.input_per_1m_gt_200k is not None
+        eff_input_rate = rate.input_per_1m_gt_200k if use_gt_200k and rate.input_per_1m_gt_200k is not None else rate.input_per_1m
+        eff_cached_rate = rate.cached_input_per_1m_gt_200k if use_gt_200k and rate.cached_input_per_1m_gt_200k is not None else rate.cached_input_per_1m
+        eff_output_rate = rate.output_per_1m_gt_200k if use_gt_200k and rate.output_per_1m_gt_200k is not None else rate.output_per_1m
+
         if calls >= min_caching_turns and uncached_prompt >= min_caching_uncached_tokens:
-            input_rate = rate.input_per_1m
-            cached_rate = rate.cached_input_per_1m
+            input_rate = eff_input_rate
+            cached_rate = eff_cached_rate
             if input_rate > cached_rate:
                 # Subsequent turns (calls - 1) can reuse cached system/context prefix
                 cacheable_tokens = int(uncached_prompt * ((calls - 1) / calls))
@@ -175,7 +185,7 @@ def generate_optimization_insights(
             thinking_share = thoughts_tokens / total_output_tokens
             if thinking_share >= min_thinking_cost_ratio:
                 thinking_cost_usd = round(
-                    (thoughts_tokens / 1_000_000) * rate.output_per_1m, 6
+                    (thoughts_tokens / 1_000_000) * eff_output_rate, 6
                 )
                 share_pct = int(round(thinking_share * 100, 0))
                 if thinking_cost_usd > 0:

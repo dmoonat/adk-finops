@@ -130,6 +130,18 @@ class CostTracker:
             cls._registry = registry
 
     @classmethod
+    def set_region(cls, region: str) -> None:
+        """Sets the pricing region ('global' or 'non_global' / specific GCP region like 'us-central1')."""
+        with cls._lock:
+            cls._registry.set_region(region)
+
+    @classmethod
+    def set_effective_date(cls, effective_date: Any) -> None:
+        """Sets the effective date (e.g. '2026-09-21' or '2027-01-01') for date-tiered pricing."""
+        with cls._lock:
+            cls._registry.set_effective_date(effective_date)
+
+    @classmethod
     def is_enabled(cls) -> bool:
         """Checks if cost tracking is globally active."""
         return cls._enabled
@@ -350,8 +362,12 @@ class CostTracker:
 
         non_cached_prompt = max(0, prompt_tokens - cached_tokens)
 
-        # Evaluate > 128k context tier if supported
-        if prompt_tokens > 128_000 and card.input_per_1m_gt_128k is not None:
+        # Evaluate > 200k context tier if supported (or legacy > 128k tier if only _gt_128k is set)
+        if prompt_tokens > 200_000 and card.input_per_1m_gt_200k is not None:
+            input_rate = card.input_per_1m_gt_200k
+            output_rate = card.output_per_1m_gt_200k if card.output_per_1m_gt_200k is not None else card.output_per_1m
+            cached_rate = card.cached_input_per_1m_gt_200k if card.cached_input_per_1m_gt_200k is not None else card.cached_input_per_1m
+        elif prompt_tokens > 128_000 and card.input_per_1m_gt_128k is not None and card.input_per_1m_gt_200k is None:
             input_rate = card.input_per_1m_gt_128k
             output_rate = card.output_per_1m_gt_128k if card.output_per_1m_gt_128k is not None else card.output_per_1m
             cached_rate = card.cached_input_per_1m_gt_128k if card.cached_input_per_1m_gt_128k is not None else card.cached_input_per_1m

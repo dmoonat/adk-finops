@@ -55,6 +55,8 @@ class FinOpsCostPlugin(BasePlugin):
         rate_card_path: str | Path | None = None,
         rate_card: dict[str, Any] | None = None,
         discount_percent: float | None = None,
+        region: str | None = None,
+        effective_date: str | None = None,
         budget_limit_usd: float | None = None,
         turn_budget_limit_usd: float | None = None,
         agent_budgets: dict[str, float] | None = None,
@@ -171,7 +173,10 @@ class FinOpsCostPlugin(BasePlugin):
                 agent_limits_usd=agent_budgets,
             )
 
-        # Apply custom rate card configuration if provided
+        # Apply custom rate card configuration & region auto-detection (GOOGLE_CLOUD_LOCATION -> ADK_FINOPS_REGION -> global)
+        CostTracker.set_region(region)
+        if effective_date is not None:
+            CostTracker.set_effective_date(effective_date)
         if rate_card_path:
             CostTracker.load_rate_card_file(str(rate_card_path))
         elif rate_card:

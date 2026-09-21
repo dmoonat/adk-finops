@@ -634,6 +634,25 @@ CostTracker.register_rate_card("my-internal-model", {
 CostTracker.register_tool_rate("internal_vector_db", 0.0005)
 ```
 
+### 6. Regional (`non_global`) & Date-Tiered (`2027`) Pricing
+`adk-finops` automatically detects your Google Cloud region and applies `non_global` regional rates (e.g., `us-central1`, `europe-west1`) as well as promotional-to-standard pricing transitions (`standard_pricing_2027` starting Jan 1, 2027):
+
+- **Region Resolution Precedence**:
+  1. Explicit `region` passed to `FinOpsCostPlugin(region="us-central1")` or `CostTracker.set_region("us-central1")`
+  2. `GOOGLE_CLOUD_LOCATION` environment variable (standard Google ADK `.env` configuration)
+  3. `ADK_FINOPS_REGION` environment variable
+  4. Defaults to `"global"`
+
+```python
+from adk_finops import CostTracker, FinOpsCostPlugin
+
+# Automatically uses GOOGLE_CLOUD_LOCATION from .env if set, or specify explicitly:
+finops_plugin = FinOpsCostPlugin(
+    region="us-central1",          # Applies non_global rates (+10% regional pricing where applicable)
+    effective_date="2027-01-01",   # Optional: simulate or enforce 2027 standard pricing
+)
+```
+
 ---
 
 ## Smart Tool Classification (MCP vs. Grounding)
@@ -648,9 +667,9 @@ CostTracker.register_tool_rate("internal_vector_db", 0.0005)
 
 ---
 
-## Gemini 2.5 Thinking Tokens Billing
+## Gemini 2.5 & 3.x Thinking Tokens Billing
 
-Gemini 2.5 Pro and Flash separate reasoning/thinking tokens into `thoughtsTokenCount`. 
+Gemini 2.5 and Gemini 3.x models separate reasoning/thinking tokens into `thoughtsTokenCount`. 
 
 Per Google Cloud pricing rules:
 > **Total Billable Output Tokens** = `candidates_token_count` + `thoughts_token_count`
@@ -669,10 +688,10 @@ from adk_finops import CostTracker, BigQueryExporter
 
 # Wrap any execution block with automatic lifecycle cleanup
 with CostTracker.track_run("request_123"):
-    # Record Gemini 2.5 call with thoughts/reasoning tokens
+    # Record Gemini call with thoughts/reasoning tokens
     CostTracker.record_usage(
         run_id="request_123",
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.7-flash",
         prompt_tokens=1500,
         completion_tokens=250,
         thoughts_tokens=100,
@@ -705,6 +724,9 @@ print(f"Total Tokens: {summary['total_tokens']}")
 
 | Variable | Type | Description |
 | :--- | :--- | :--- |
+| `GOOGLE_CLOUD_LOCATION` | `str` | Primary ADK environment variable for region detection (e.g., `"global"`, `"us-central1"`). Non-global regions automatically apply `non_global` rates. |
+| `ADK_FINOPS_REGION` | `str` | Fallback pricing region if `GOOGLE_CLOUD_LOCATION` is not set (defaults to `"global"`). |
+| `ADK_FINOPS_EFFECTIVE_DATE` | `str` | ISO date (`YYYY-MM-DD`) to evaluate date-tiered pricing such as `standard_pricing_2027` (defaults to today's date). |
 | `ADK_FINOPS_RATE_CARD_PATH` | `str` | Absolute or relative path to a custom JSON rate card file. |
 | `ADK_FINOPS_DISCOUNT_PERCENT` | `float` | Global enterprise discount percentage (e.g., `15.0` for 15%). |
 | `ADK_FINOPS_OPTIMIZATION_ADVISOR` | `bool` | Toggle the Automated FinOps Optimization Advisor (`"true"` or `"false"`). |
@@ -718,6 +740,8 @@ FinOpsCostPlugin(
     rate_card_path: str | Path | None = None,
     rate_card: dict[str, Any] | None = None,
     discount_percent: float | None = None,
+    region: str | None = None,
+    effective_date: str | date | None = None,
     budget_limit_usd: float | None = None,
     turn_budget_limit_usd: float | None = None,
     agent_budgets: dict[str, float] | None = None,
@@ -733,6 +757,8 @@ FinOpsCostPlugin(
 | `default_model` | `str` | `"gemini-2.5-flash"` | Fallback model name if not reported by the LLM response. |
 | `rate_card_path` | `str \| Path` | `None` | Path to custom rate card JSON file. |
 | `discount_percent` | `float` | `None` | Enterprise volume discount percentage (e.g. `15.0` for 15%). |
+| `region` | `str \| None` | `None` | Pricing region override. When `None`, auto-detects from `GOOGLE_CLOUD_LOCATION` $\rightarrow$ `ADK_FINOPS_REGION` $\rightarrow$ `"global"`. |
+| `effective_date` | `str \| date` | `None` | Optional ISO date (`"YYYY-MM-DD"`) for date-tiered pricing (e.g. `"2027-01-01"` for 2027 standard rates). |
 | `budget_limit_usd` | `float` | `None` | Maximum cumulative spending limit in USD for the entire chat session. |
 | `turn_budget_limit_usd` | `float` | `None` | Maximum spending limit in USD for any single user turn. |
 | `agent_budgets` | `dict[str, float]` | `None` | Per-agent spending caps in USD (e.g. `{"researcher": 0.50, "coder": 1.00}`). |
@@ -745,18 +771,30 @@ FinOpsCostPlugin(
 
 ## Built-In Model Rate Cards
 
-The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) contains standard public pricing (USD per 1M tokens):
+The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) contains official public pricing (USD per 1M tokens, sourced from [Google Cloud Generative AI Pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing)):
 
-| Model | Provider | Input / 1M | Output / 1M | Cached / 1M | Context >128k Tier |
+| Model | Provider | Input / 1M (`<=200k`) | Output / 1M (`<=200k`) | Cached / 1M (`<=200k`) | Context `>200k` (`_gt_200k`) / Regional (`non_global`) / 2027 Notes |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| `gemini-3.8-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
-| `gemini-3.5-flash` | Google | \$1.50 | \$9.00 | \$0.15 | — |
-| `gemini-3.7-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
-| `gemini-3.6-flash` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
-| `codemender` | Google | \$0.75 | \$3.75 | \$0.075 | Standard 2027: In \$1.50, Out \$7.50 |
-| `gemini-3.5-flash` | Google | \$1.50 | \$9.00 | \$0.15 | — |
-| `gemini-2.5-flash` | Google | \$0.30 | \$2.50 | \$0.03 | — |
-| `gemini-2.5-pro` | Google | \$1.25 | \$5.00 | \$0.3125 | In: \$2.50, Out: \$10.00 |
+| `gemini-3.1-pro-preview` | Google | \$2.00 | \$12.00 | \$0.20 | **`>200k`**: In \$4.00, Out \$18.00, Cached \$0.40 |
+| `gemini-3.8-flash-cyber` | Google | \$1.50 | \$7.50 | \$0.15 | **Non-global**: In \$1.65, Out \$8.25, Cached \$0.165 |
+| `gemini-3.8-flash` | Google | \$0.75 | \$3.75 | \$0.075 | **Non-global**: \$0.825 / \$4.125 • **2027 Standard**: \$1.50 / \$7.50 (Non-global: \$1.65 / \$8.25) |
+| `gemini-3.7-flash` | Google | \$0.75 | \$3.75 | \$0.075 | **Non-global**: \$0.825 / \$4.125 • **2027 Standard**: \$1.50 / \$7.50 (Non-global: \$1.65 / \$8.25) |
+| `gemini-3.6-flash` | Google | \$0.75 | \$3.75 | \$0.075 | **Non-global**: \$0.825 / \$4.125 • **2027 Standard**: \$1.50 / \$7.50 (Non-global: \$1.65 / \$8.25) |
+| `gemini-3.5-flash` | Google | \$1.50 | \$9.00 | \$0.15 | **Non-global**: In \$1.65, Out \$9.90, Cached \$0.165 |
+| `gemini-3.5-flash-lite` | Google | \$0.30 | \$2.50 | \$0.03 | **Non-global**: In \$0.33, Out \$2.75, Cached \$0.033 |
+| `gemini-3.1-flash-lite` | Google | \$0.25 | \$1.50 | \$0.025 | **Non-global**: In \$0.275, Out \$1.65, Cached \$0.0275 |
+| `gemini-3-flash-preview` | Google | \$0.50 | \$3.00 | \$0.05 | — |
+| `gemini-3-pro-image` | Google | \$2.00 | \$12.00 | \$0.20 | **`>200k`**: In \$4.00, Out \$18.00, Cached \$0.40 |
+| `gemini-3.1-flash-image` | Google | \$0.50 | \$3.00 | \$0.05 | Nano Banana 2 image generation |
+| `gemini-3.1-flash-lite-image` | Google | \$0.25 | \$1.50 | \$0.025 | Nano Banana Lite image generation |
+| `gemini-2.5-pro` | Google | \$1.25 | \$10.00 | \$0.125 | **`>200k`**: In \$2.50, Out \$15.00, Cached \$0.25 |
+| `gemini-2.5-pro-computer-use-preview` | Google | \$1.25 | \$10.00 | \$0.125 | **`>200k`**: In \$2.50, Out \$15.00, Cached \$0.25 |
+| `gemini-2.5-flash` | Google | \$0.30 | \$2.50 | \$0.03 | **`>200k`**: In \$0.30, Out \$2.50, Cached \$0.03 |
+| `gemini-2.5-flash-lite` | Google | \$0.10 | \$0.40 | \$0.01 | **`>200k`**: In \$0.10, Out \$0.40, Cached \$0.01 |
+| `gemini-2.5-flash-image` | Google | \$0.30 | \$2.50 | \$0.03 | — |
+| `gemini-2.5-flash-live` | Google | \$0.50 | \$2.00 | \$0.05 | Live API text rates |
+| `gemini-2.0-flash` | Google | \$0.15 | \$0.60 | \$0.0375 | — |
+| `codemender` | Google | \$0.75 | \$3.75 | \$0.075 | **2027 Standard**: In \$1.50, Out \$7.50, Cached \$0.15 |
 | `gpt-4o` | OpenAI | \$2.50 | \$10.00 | \$1.25 | — |
 | `gpt-4o-mini` | OpenAI | \$0.15 | \$0.60 | \$0.075 | — |
 | `o1` | OpenAI | \$15.00 | \$60.00 | \$7.50 | — |

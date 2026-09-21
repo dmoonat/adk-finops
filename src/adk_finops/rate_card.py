@@ -38,6 +38,22 @@ from .rates import DEFAULT_RATES_FILE
 logger = logging.getLogger("adk_finops.rate_card")
 
 
+def _resolve_region(explicit_region: str | None = None) -> str:
+    """Resolves pricing region in priority order:
+    1. Explicit region argument (if provided)
+    2. GOOGLE_CLOUD_LOCATION environment variable (standard for Google ADK / GenAI)
+    3. ADK_FINOPS_REGION environment variable
+    4. Default: 'global'
+    """
+    val = (
+        explicit_region
+        or os.environ.get("GOOGLE_CLOUD_LOCATION")
+        or os.environ.get("ADK_FINOPS_REGION")
+        or "global"
+    )
+    return val.strip().lower()
+
+
 @dataclass
 class ModelRate:
     """Pricing rate card for an individual LLM model."""
@@ -46,40 +62,78 @@ class ModelRate:
     input_per_1m: float = 0.30
     output_per_1m: float = 2.50
     cached_input_per_1m: float = 0.03
+    input_per_1m_gt_200k: float | None = None
+    output_per_1m_gt_200k: float | None = None
+    cached_input_per_1m_gt_200k: float | None = None
     input_per_1m_gt_128k: float | None = None
     output_per_1m_gt_128k: float | None = None
     cached_input_per_1m_gt_128k: float | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ModelRate:
-        """Creates a ModelRate from a raw dictionary, respecting transition dates."""
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        region: str | None = None,
+        effective_date: Any = None,
+    ) -> ModelRate:
+        """Creates a ModelRate from a raw dictionary, respecting region and transition dates."""
         from datetime import date
 
+        eff_date: date
+        if isinstance(effective_date, date):
+            eff_date = effective_date
+        elif isinstance(effective_date, str) and effective_date.strip():
+            eff_date = date.fromisoformat(effective_date.strip()[:10])
+        else:
+            env_dt = os.environ.get("ADK_FINOPS_EFFECTIVE_DATE", "").strip()
+            eff_date = date.fromisoformat(env_dt[:10]) if env_dt else date.today()
+
+        clean_region = _resolve_region(region)
+        is_non_global = clean_region not in ("global", "", "default")
+
         effective_data = dict(data)
-        # Automatically apply standard pricing starting January 1, 2027
-        if "standard_pricing_2027" in data and date.today() >= date(2027, 1, 1):
-            effective_data.update(data["standard_pricing_2027"])
+        # 1. Apply regional (non-global) base rates if in non-global region
+        if is_non_global and isinstance(effective_data.get("non_global"), dict):
+            effective_data.update(effective_data["non_global"])
+
+        # 2. Automatically apply standard pricing starting January 1, 2027
+        if "standard_pricing_2027" in data and eff_date >= date(2027, 1, 1):
+            p2027 = data["standard_pricing_2027"]
+            if isinstance(p2027, dict):
+                effective_data.update(
+                    {k: v for k, v in p2027.items() if k != "non_global"}
+                )
+                if is_non_global:
+                    if isinstance(p2027.get("non_global"), dict):
+                        effective_data.update(p2027["non_global"])
+                    elif isinstance(data.get("non_global"), dict):
+                        # Derive proportional regional multiplier if non_global is only at root
+                        base_in = float(data.get("input_per_1m", 0.75) or 0.75)
+                        ng_in = float(data["non_global"].get("input_per_1m", base_in))
+                        mult = (ng_in / base_in) if base_in > 0 else 1.1
+                        effective_data["input_per_1m"] = round(float(effective_data["input_per_1m"]) * mult, 6)
+                        effective_data["output_per_1m"] = round(float(effective_data["output_per_1m"]) * mult, 6)
+                        effective_data["cached_input_per_1m"] = round(float(effective_data["cached_input_per_1m"]) * mult, 6)
+
+        in_gt_200k = effective_data.get("input_per_1m_gt_200k", effective_data.get("input_per_1m_gt_128k"))
+        out_gt_200k = effective_data.get("output_per_1m_gt_200k", effective_data.get("output_per_1m_gt_128k"))
+        cached_gt_200k = effective_data.get("cached_input_per_1m_gt_200k", effective_data.get("cached_input_per_1m_gt_128k"))
+
+        in_gt_128k = effective_data.get("input_per_1m_gt_128k", in_gt_200k)
+        out_gt_128k = effective_data.get("output_per_1m_gt_128k", out_gt_200k)
+        cached_gt_128k = effective_data.get("cached_input_per_1m_gt_128k", cached_gt_200k)
 
         return cls(
             provider=effective_data.get("provider", "unknown"),
             input_per_1m=float(effective_data.get("input_per_1m", 0.30)),
             output_per_1m=float(effective_data.get("output_per_1m", 2.50)),
             cached_input_per_1m=float(effective_data.get("cached_input_per_1m", 0.03)),
-            input_per_1m_gt_128k=(
-                float(data["input_per_1m_gt_128k"])
-                if "input_per_1m_gt_128k" in data and data["input_per_1m_gt_128k"] is not None
-                else None
-            ),
-            output_per_1m_gt_128k=(
-                float(data["output_per_1m_gt_128k"])
-                if "output_per_1m_gt_128k" in data and data["output_per_1m_gt_128k"] is not None
-                else None
-            ),
-            cached_input_per_1m_gt_128k=(
-                float(data["cached_input_per_1m_gt_128k"])
-                if "cached_input_per_1m_gt_128k" in data and data["cached_input_per_1m_gt_128k"] is not None
-                else None
-            ),
+            input_per_1m_gt_200k=float(in_gt_200k) if in_gt_200k is not None else None,
+            output_per_1m_gt_200k=float(out_gt_200k) if out_gt_200k is not None else None,
+            cached_input_per_1m_gt_200k=float(cached_gt_200k) if cached_gt_200k is not None else None,
+            input_per_1m_gt_128k=float(in_gt_128k) if in_gt_128k is not None else None,
+            output_per_1m_gt_128k=float(out_gt_128k) if out_gt_128k is not None else None,
+            cached_input_per_1m_gt_128k=float(cached_gt_128k) if cached_gt_128k is not None else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -90,13 +144,22 @@ class ModelRate:
 class RateCardRegistry:
     """Thread-safe registry for model and tool pricing rate cards."""
 
-    def __init__(self, load_defaults: bool = True) -> None:
+    def __init__(
+        self,
+        load_defaults: bool = True,
+        region: str | None = None,
+        effective_date: Any = None,
+    ) -> None:
         self._lock = threading.RLock()
+        self._raw_models: dict[str, dict[str, Any]] = {}
         self._models: dict[str, ModelRate] = {}
         self._tools: dict[str, float] = {}
         self._fallback: ModelRate = ModelRate()
         self._provider_discounts: dict[str, float] = {}  # provider -> discount multiplier (e.g. 0.85)
         self._global_discount: float = 1.0  # multiplier (1.0 = no discount)
+        self._explicit_region: str | None = region.strip().lower() if region else None
+        self._region: str = _resolve_region(self._explicit_region)
+        self._effective_date: Any = effective_date or os.environ.get("ADK_FINOPS_EFFECTIVE_DATE")
 
         if load_defaults:
             self.load_defaults()
@@ -117,6 +180,44 @@ class RateCardRegistry:
             except ValueError:
                 pass
 
+    def _rebuild_models(self) -> None:
+        """Re-evaluates raw model dictionaries with the current region and effective_date."""
+        with self._lock:
+            for name, mdata in self._raw_models.items():
+                self._models[name] = ModelRate.from_dict(
+                    mdata,
+                    region=self._region,
+                    effective_date=self._effective_date,
+                )
+
+    def set_region(self, region: str | None) -> None:
+        """Sets the pricing region ('global' or 'non_global' / specific GCP location like 'us-central1').
+        Pass None to reset to environment-variable auto-detection (GOOGLE_CLOUD_LOCATION -> ADK_FINOPS_REGION -> 'global').
+        """
+        with self._lock:
+            self._explicit_region = region.strip().lower() if region else None
+            self._region = _resolve_region(self._explicit_region)
+            self._rebuild_models()
+
+    @property
+    def region(self) -> str:
+        if self._explicit_region is None:
+            env_reg = _resolve_region(None)
+            if env_reg != self._region:
+                self._region = env_reg
+                self._rebuild_models()
+        return self._region
+
+    def set_effective_date(self, effective_date: Any) -> None:
+        """Sets the effective date (e.g. '2026-09-21' or '2027-01-01') for date-tiered pricing."""
+        with self._lock:
+            self._effective_date = effective_date
+            self._rebuild_models()
+
+    @property
+    def effective_date(self) -> Any:
+        return self._effective_date
+
     def load_defaults(self) -> None:
         """Loads default bundled rate card from default_rates.json."""
         if DEFAULT_RATES_FILE.exists():
@@ -130,7 +231,13 @@ class RateCardRegistry:
             # Models
             models_data = data.get("models", {})
             for name, mdata in models_data.items():
-                self._models[name.strip().lower()] = ModelRate.from_dict(mdata)
+                clean_name = name.strip().lower()
+                self._raw_models[clean_name] = dict(mdata)
+                self._models[clean_name] = ModelRate.from_dict(
+                    mdata,
+                    region=self._region,
+                    effective_date=self._effective_date,
+                )
 
             # Tools
             tools_data = data.get("tools", {})
@@ -139,7 +246,11 @@ class RateCardRegistry:
 
             # Fallback
             if "fallback" in data:
-                self._fallback = ModelRate.from_dict(data["fallback"])
+                self._fallback = ModelRate.from_dict(
+                    data["fallback"],
+                    region=self._region,
+                    effective_date=self._effective_date,
+                )
 
     def load_from_file(self, file_path: str | Path) -> None:
         """Loads rate cards from a JSON file path."""
@@ -204,6 +315,8 @@ class RateCardRegistry:
 
         clean = model_name.strip().lower()
         with self._lock:
+            # Ensure late-loaded GOOGLE_CLOUD_LOCATION / ADK_FINOPS_REGION env vars are reflected
+            _ = self.region
             # 1. Exact match
             if clean in self._models:
                 return self._models[clean]
