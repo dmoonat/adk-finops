@@ -8,7 +8,8 @@
 
 **Universal FinOps cost, token usage, and grounding fee tracking for the Google Agent Development Kit (ADK) and LLM workflows.**
 
-![adk-finops Near-Live FinOps Web Dashboard](img/filter_dashboard.png)
+![adk-finops Near-Live FinOps Web Dashboard](https://raw.githubusercontent.com/dmoonat/adk-finops/main/img/filter_dashboard.png)
+
 
 ---
 
@@ -916,7 +917,8 @@ Because both aggregate rows and attributed breakdown rows coexist in the same ta
 
 ### Near-Live FinOps Web Dashboard (`adk-finops dashboard`)
 
-![Near-Live FinOps Web Dashboard — Overview](img/all_dashboard.png)
+![Near-Live FinOps Web Dashboard — Overview](https://raw.githubusercontent.com/dmoonat/adk-finops/main/img/all_dashboard.png)
+
 
 `adk-finops` includes a built-in, zero-extra-dependency **FastAPI + Chart.js Near-Live Web Dashboard** that auto-refreshes every **2 seconds**, aggregating:
 1. **Live In-Memory `CostTracker` State:** Watch tokens and spend accumulate in real time while an agent is mid-execution.
@@ -926,7 +928,7 @@ Because both aggregate rows and attributed breakdown rows coexist in the same ta
 
 #### Hierarchical Root (Parent) Agent ➔ Sub-Agent Drilldown & Cascading Filters
 
-![Near-Live FinOps Web Dashboard — Root Agent & Sub-Agent Filtered View](img/filter_dashboard.png)
+![Near-Live FinOps Web Dashboard — Root Agent & Sub-Agent Filtered View](https://raw.githubusercontent.com/dmoonat/adk-finops/main/img/filter_dashboard.png)
 
 - **5 Cascading Hierarchy Filters:**
   1. **`1. 👑 Root (Parent) Agent`:** Filter by a top-level orchestrator/parent agent (e.g., `👑 coordinator_agent`). Selecting a Root Agent automatically computes the **Overall Parent-Level Spend & Tokens (`∑ Parent + All Sub-Agents`)** in the KPI cards while displaying all of its sub-agents in the breakdown charts and hierarchy tree.
