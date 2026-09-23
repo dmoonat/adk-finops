@@ -61,10 +61,14 @@ except ImportError:
         """Fallback shim when google-adk is not installed."""
 
     class _FallbackTypes:
-        class Part:
-            @staticmethod
-            def from_text(*, text: str) -> dict[str, str]:
-                return {"text": text}
+        class Part(dict):
+            def __init__(self, text: str = "") -> None:
+                super().__init__(text=text)
+                self.text = text
+
+            @classmethod
+            def from_text(cls, *, text: str) -> "_FallbackTypes.Part":
+                return cls(text=text)
 
         class Content:
             def __init__(
