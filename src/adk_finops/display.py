@@ -267,7 +267,7 @@ def render_rich_summary(
             )
         render_items.append(tool_table)
 
-    # --- 5. Budget Status Footer ---
+    # --- 5. Budget Status & Pre-Flight Guard Footer ---
     if budget_info and budget_info.get("budget_limit_usd"):
         b_limit = budget_info.get("budget_limit_usd", 0.0)
         b_curr = budget_info.get("current_cost_usd", 0.0)
@@ -283,6 +283,24 @@ def render_rich_summary(
             b_text.append(" 🛡️  Budget Guard: ", style="bold " + b_color)
             b_text.append(f"{_format_usd(b_curr)} / {_format_usd(b_limit)} ({b_pct:.1f}% utilized)", style=b_color)
         render_items.append(b_text)
+
+    pf_blocks = int(sess_info.get("preflight_blocks_count", 0) or 0)
+    pf_downgrades = int(sess_info.get("preflight_downgrades_count", 0) or 0)
+    pf_avoided_usd = float(sess_info.get("preflight_avoided_cost_usd", 0.0) or 0.0)
+    pf_avoided_tok = int(sess_info.get("preflight_avoided_tokens", 0) or 0)
+    if pf_blocks > 0 or pf_downgrades > 0:
+        pf_text = Text()
+        pf_text.append(" 🛑 Pre-Flight Guard: ", style="bold magenta")
+        actions_parts = []
+        if pf_blocks > 0:
+            actions_parts.append(f"{pf_blocks} blocked")
+        if pf_downgrades > 0:
+            actions_parts.append(f"{pf_downgrades} downgraded")
+        pf_text.append(
+            f"{', '.join(actions_parts)} | Avoided {_format_usd(pf_avoided_usd)} ({_format_tokens(pf_avoided_tok)} input tokens)",
+            style="magenta",
+        )
+        render_items.append(pf_text)
 
     # --- 6. Automated FinOps Optimization Advisor ---
     insights, pot_usd, pot_pct = _resolve_optimization_insights(summary, show_optimization_insights)

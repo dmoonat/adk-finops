@@ -30,6 +30,7 @@ from typing import Any
 
 try:
     from google.adk.agents.invocation_context import InvocationContext
+    from google.adk.models.llm_request import LlmRequest
     from google.adk.models.llm_response import LlmResponse
     from google.adk.plugins import BasePlugin
     from google.adk.plugins.base_plugin import CallbackContext
@@ -38,9 +39,17 @@ try:
     from google.genai import types
 except ImportError:
     InvocationContext = Any  # type: ignore[misc,assignment]
-    LlmResponse = Any  # type: ignore[misc,assignment]
+    LlmRequest = Any  # type: ignore[misc,assignment]
     CallbackContext = Any  # type: ignore[misc,assignment]
     ToolContext = Any  # type: ignore[misc,assignment]
+
+    class LlmResponse:  # type: ignore[no-redef]
+        """Fallback shim when google-adk is not installed."""
+
+        def __init__(self, content: Any = None, **kwargs: Any) -> None:
+            self.content = content
+            for k, v in kwargs.items():
+                setattr(self, k, v)
 
     class BasePlugin:  # type: ignore[no-redef]
         """Fallback shim when google-adk is not installed."""
@@ -58,11 +67,17 @@ except ImportError:
                 return {"text": text}
 
         class Content:
-            def __init__(self, parts: list[Any] | None = None) -> None:
+            def __init__(
+                self,
+                parts: list[Any] | None = None,
+                role: str | None = None,
+            ) -> None:
                 self.parts = parts or []
+                self.role = role
 
     types = _FallbackTypes()  # type: ignore[assignment]
 
+from .estimator import estimate_request_tokens
 from .tracker import BudgetExceededError, CostTracker
 
 logger = logging.getLogger("adk_finops.plugin")
@@ -90,6 +105,8 @@ class FinOpsCostPlugin(BasePlugin):
         budget_limit_usd: float | None = None,
         turn_budget_limit_usd: float | None = None,
         agent_budgets: dict[str, float] | None = None,
+        max_prompt_tokens: int | None = None,
+        preflight_budget_guard: bool = True,
         on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
         fallback_model: str = "gemini-2.5-flash",
         render_terminal_box: bool = True,
@@ -109,6 +126,8 @@ class FinOpsCostPlugin(BasePlugin):
         export_scope: str | None = None,
         export_tags: dict[str, Any] | None = None,
         tool_rates: dict[str, float] | None = None,
+        token_profiles: dict[str, dict[str, Any]] | None = None,
+        token_profiles_path: str | Path | None = None,
     ):
         super().__init__(name=name)
         try:
@@ -122,6 +141,22 @@ class FinOpsCostPlugin(BasePlugin):
         self.budget_limit_usd = budget_limit_usd
         self.turn_budget_limit_usd = turn_budget_limit_usd
         self.agent_budgets = agent_budgets
+        env_max_tok = os.getenv("ADK_FINOPS_MAX_PROMPT_TOKENS", "").strip()
+        if max_prompt_tokens is not None:
+            self.max_prompt_tokens: int | None = int(max_prompt_tokens)
+        elif env_max_tok.isdigit():
+            self.max_prompt_tokens = int(env_max_tok)
+        else:
+            self.max_prompt_tokens = None
+
+        env_preflight = os.getenv("ADK_FINOPS_PREFLIGHT_GUARD", "").strip().lower()
+        if env_preflight in ("0", "false", "no", "off"):
+            self.preflight_budget_guard = False
+        elif env_preflight in ("1", "true", "yes", "on"):
+            self.preflight_budget_guard = True
+        else:
+            self.preflight_budget_guard = bool(preflight_budget_guard)
+
         self.on_budget_exceeded = on_budget_exceeded.lower()
         self.fallback_model = fallback_model
         self.render_terminal_box = render_terminal_box
@@ -131,6 +166,12 @@ class FinOpsCostPlugin(BasePlugin):
                 clean_t = t_name.strip().lower()
                 self.tool_rates[clean_t] = float(t_fee)
                 CostTracker.register_tool_rate(clean_t, float(t_fee))
+        if token_profiles_path:
+            CostTracker.load_token_profiles_file(token_profiles_path)
+        if token_profiles:
+            for p_key, p_cfg in token_profiles.items():
+                if isinstance(p_cfg, dict):
+                    CostTracker.register_token_profile(p_key, p_cfg, merge=True)
         env_advisor = os.getenv("ADK_FINOPS_OPTIMIZATION_ADVISOR", "").strip().lower()
         if env_advisor in ("0", "false", "no", "off"):
             self.enable_optimization_advisor = False
@@ -204,11 +245,17 @@ class FinOpsCostPlugin(BasePlugin):
             )
 
         # Configure budgets in CostTracker if specified
-        if budget_limit_usd is not None or turn_budget_limit_usd is not None or agent_budgets is not None:
+        if (
+            budget_limit_usd is not None
+            or turn_budget_limit_usd is not None
+            or agent_budgets is not None
+            or self.max_prompt_tokens is not None
+        ):
             CostTracker.set_budget(
                 session_limit_usd=budget_limit_usd,
                 turn_limit_usd=turn_budget_limit_usd,
                 agent_limits_usd=agent_budgets,
+                max_prompt_tokens=self.max_prompt_tokens,
             )
 
         # Apply custom rate card configuration & region auto-detection (GOOGLE_CLOUD_LOCATION -> ADK_FINOPS_REGION -> global)
@@ -352,6 +399,125 @@ class FinOpsCostPlugin(BasePlugin):
                 print(msg, flush=True)
                 logger.warning(msg)
 
+        return None
+
+    async def before_model_callback(
+        self, *, callback_context: CallbackContext, llm_request: LlmRequest
+    ) -> LlmResponse | None:
+        """Pre-flight budget guard that estimates input tokens and USD cost BEFORE the LLM network call.
+
+        Blocks massive prompts (e.g., >200K tokens) or projected budget breaches at $0.00 cloud cost
+        by returning an early LlmResponse ("halt") or downgrading llm_request.model in-place ("downgrade").
+        """
+        if not self.preflight_budget_guard:
+            return None
+
+        turn_id, session_id = self._extract_ids(callback_context)
+        agent_name = self._extract_agent_name(callback_context)
+        target_model = (
+            getattr(llm_request, "model", None)
+            or getattr(getattr(callback_context, "agent", None), "model", None)
+            or self.default_model
+        )
+        if not isinstance(target_model, str) or not target_model:
+            target_model = self.default_model
+
+        est = estimate_request_tokens(llm_request, model_name=target_model)
+        est_prompt_tokens = est["prompt_tokens"]
+        est_cached_tokens = est["cached_tokens"]
+
+        is_exceeded, reason, preflight_status = CostTracker.check_preflight_budget(
+            model_name=target_model,
+            estimated_prompt_tokens=est_prompt_tokens,
+            estimated_cached_tokens=est_cached_tokens,
+            run_id=turn_id,
+            session_id=session_id,
+            agent_name=agent_name,
+            max_prompt_tokens_override=self.max_prompt_tokens,
+        )
+
+        if not is_exceeded:
+            return None
+
+        est_call_cost = preflight_status.get("estimated_call_cost_usd", 0.0)
+        scope = preflight_status.get("scope")
+
+        # 1. Downgrade mode: switch llm_request.model to fallback_model before the network call
+        if (
+            self.on_budget_exceeded == "downgrade"
+            and scope != "max_prompt_tokens"
+            and self.fallback_model
+            and target_model != self.fallback_model
+        ):
+            downgraded_cost = CostTracker.calculate_call_cost(
+                model_name=self.fallback_model,
+                prompt_tokens=est_prompt_tokens,
+                completion_tokens=0,
+                cached_tokens=est_cached_tokens,
+            )
+            avoided_cost = max(0.0, round(est_call_cost - downgraded_cost, 7))
+            if hasattr(llm_request, "model"):
+                llm_request.model = self.fallback_model
+            inv_ctx = getattr(callback_context, "invocation_context", None) or getattr(
+                callback_context, "_invocation_context", None
+            )
+            if inv_ctx is not None and hasattr(inv_ctx, "agent") and inv_ctx.agent is not None:
+                inv_ctx.agent.model = self.fallback_model
+            if hasattr(callback_context, "agent") and callback_context.agent is not None:
+                callback_context.agent.model = self.fallback_model
+
+            CostTracker.record_preflight_event(
+                run_id=turn_id,
+                session_id=session_id,
+                action="downgraded",
+                estimated_prompt_tokens=est_prompt_tokens,
+                avoided_cost_usd=avoided_cost,
+            )
+            msg = (
+                f"⚠️ [FinOps Pre-Flight Guard] Downgraded outgoing request model from {target_model} "
+                f"to {self.fallback_model} before execution: {reason} "
+                f"(new est. call cost: ${downgraded_cost:.6f}, saved ${avoided_cost:.6f})"
+            )
+            print(msg, flush=True)
+            logger.warning(msg)
+            return None
+
+        # 2. Halt mode: short-circuit before the network request is sent ($0.00 cloud cost)
+        if self.on_budget_exceeded == "halt" or scope == "max_prompt_tokens":
+            CostTracker.record_preflight_event(
+                run_id=turn_id,
+                session_id=session_id,
+                action="blocked",
+                estimated_prompt_tokens=est_prompt_tokens,
+                avoided_cost_usd=est_call_cost,
+            )
+            CostTracker.record_task_status(
+                session_id=session_id,
+                run_id=turn_id,
+                status="budget_exceeded",
+                error=reason,
+            )
+            halt_msg = (
+                f"🛑 [FinOps Pre-Flight Guard] Request blocked before LLM call "
+                f"($0.00 spent, avoided ~${est_call_cost:.4f} / {est_prompt_tokens:,} input tokens): {reason}"
+            )
+            print(halt_msg, flush=True)
+            logger.warning(halt_msg)
+            return LlmResponse(
+                content=types.Content(
+                    role="model",
+                    parts=[
+                        types.Part.from_text(
+                            text=f"⚠️ [FinOps Pre-Flight Guard] Request blocked before execution: {reason}"
+                        )
+                    ],
+                )
+            )
+
+        # 3. Warn mode: log pre-flight warning and let request proceed
+        warn_msg = f"⚠️ [FinOps Pre-Flight Guard] Warning: {reason}"
+        print(warn_msg, flush=True)
+        logger.warning(warn_msg)
         return None
 
     async def after_model_callback(

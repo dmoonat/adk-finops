@@ -68,9 +68,9 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 
 ## Key Features
 
-- **Native Google ADK Integration**: Intercepts model and tool invocations via the ADK `BasePlugin` lifecycle (`before_run`, `after_model`, `on_event`, `after_tool`, `after_run`).
+- **Native Google ADK Integration**: Intercepts model and tool invocations via the ADK `BasePlugin` lifecycle (`before_run`, `before_model`, `after_model`, `on_event`, `after_tool`, `after_run`).
 - **Dual-Scope Accounting**: Simultaneously tracks metrics for both the **active turn** (all calls within a user message) and the **cumulative session** (entire conversation history).
-- **Budget Guards & Circuit Breakers**: Set hard session and turn USD spending limits. Prevent runaway bills by halting execution, emitting warnings, or automatically downgrading expensive models (e.g. Gemini 2.5 Pro → Flash) when limits are breached.
+- **Pre-Flight & Post-Call Budget Guards**: Estimate input tokens and projected cost in `before_model_callback` (`< 0.5ms`) using deterministic provider token profiles (`google`, `openai`, `anthropic`, `deepseek`). Block massive 200K+ token dumps (`max_prompt_tokens`) at `$0.00` cloud cost or automatically downgrade models (`gemini-2.5-pro` ➔ `gemini-2.5-flash`) in-place before the request leaves the process.
 - **Automated FinOps Optimization Advisor**: Zero-LLM, deterministic rule engine that analyzes completed session telemetry in `< 1ms` and calculates concrete `$` and `%` savings across **Context Caching Opportunities**, **Thinking Token Alerts** (`thinking_budget=0`), and **Model Right-Sizing** (`gemini-3.5-flash` ➔ `gemini-3.5-flash-lite`, `gemini-2.5-pro` ➔ `gemini-2.5-flash`, `gpt-4o` ➔ `gpt-4o-mini`). Easily toggled on/off via `enable_optimization_advisor=True/False`.
 - **Task Outcome & Wasted Spend Analytics**: Distinguishes productive spend (`status="success"`) from wasted capital burned on failed retry loops or runtime exceptions (`status="failed"`, `"error"`). Computes average spend per successful task vs. average wasted spend per failed loop, capital loss percentage, and auto-exports crashed sessions to BigQuery.
 - **Context Caching Savings ROI**: Demonstrates financial value by tracking gross cost (cost without caching) vs. actual net cost, reporting exact dollars and percentage saved (e.g. up to 90% savings via Gemini Context Caching).
@@ -217,7 +217,7 @@ Run your agent with `adk web` or `adk run`. Telemetry will log directly to the t
 
 ## Budget Guards & Circuit Breakers
 
-Prevent runaway agent loops and surprise bills with proactive budget enforcement. Set hard USD spending limits per session or per turn:
+Prevent runaway agent loops and surprise bills with **both Pre-Flight (`before_model_callback`) and Post-Call (`after_model_callback`)** budget enforcement. Set hard USD spending limits per session, per turn, or per sub-agent, plus an optional hard ceiling on input prompt tokens (`max_prompt_tokens`):
 
 ```python
 from adk_finops import FinOpsCostPlugin
@@ -226,18 +226,65 @@ finops_plugin = FinOpsCostPlugin(
     default_model="gemini-2.5-pro",
     budget_limit_usd=1.00,             # Hard stop at $1.00 per chat session
     turn_budget_limit_usd=0.25,        # Maximum $0.25 on any single turn
+    max_prompt_tokens=200_000,         # Pre-flight token cap (e.g. prevent 2x >200K tier charges)
+    preflight_budget_guard=True,       # Estimate input tokens & cost BEFORE the network call (default: True)
     on_budget_exceeded="halt",         # Action: "halt", "warn", or "downgrade"
     fallback_model="gemini-2.5-flash", # Target model when using "downgrade"
 )
 ```
 
+### Pre-Flight Estimation (`before_model_callback`)
+Before every outgoing LLM request, `adk-finops` estimates input tokens across system instructions, conversation history, tool schemas, function call/response payloads, and inline multimodal parts in **`< 0.5ms` with zero network overhead** (`estimate_request_tokens(llm_request, model_name=...)`):
+- Automatically resolves the provider (`google`, `openai`, `anthropic`, `deepseek`) from `llm_request.model` and applies provider-specific tokenization profiles (`PROVIDER_TOKEN_PROFILES`).
+- Calculates `projected_cost_usd = current_cost_usd + estimated_call_cost_usd` (accounting for `>200K` context tier pricing and cached tokens).
+- If `projected_cost_usd` would exceed your **Agent**, **Turn**, or **Session** budget (or if `estimated_prompt_tokens > max_prompt_tokens`), `before_model_callback` intervenes **before** the request is sent to the LLM provider — incurring **\$0.00 in cloud charges**.
+
+| Component | Google (`gemini-*`) | OpenAI (`gpt-4o`, `o1`, `o3`) | Anthropic (`claude-*`) | DeepSeek (`deepseek-*`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **ASCII Chars / Token** | `4.0` (SentencePiece 256k) | `4.4` (`o200k_base`) / `4.0` (`cl100k_base`) *(or exact `tiktoken` if installed)* | `3.6` (Claude 65k BPE vocab) | `3.7` (128k BPE vocab) |
+| **Turn Framing** | `+4` tokens / msg | `+4` tokens / msg | `+5` tokens / msg | `+4` tokens / msg |
+| **Tool Call / Resp Envelope** | `+8` tokens | `+12` tokens | `+16` tokens | `+10` tokens |
+| **Hidden Tool System Preamble** | `0` tokens | `+16` tokens | **Dynamic by model & `tool_choice`**:<br>• Opus: `286` (`auto`/`none`) / `406` (`forced`)<br>• Sonnet: `354` (`auto`/`none`) / `474` (`forced`)<br>• Haiku: `264` (`auto`/`none`) / `340` (`forced`) | `+12` tokens |
+| **Per-Tool Schema Overhead** | `+36` tokens / tool | `+42` tokens / tool | `+45` tokens / tool | `+40` tokens / tool |
+| **Images (`image/*`)** | `258` tokens | `425` tokens (`85` + `2×170` tiles) | `1,334` tokens (`(1024×1024)/750`) | `512` tokens |
+| **PDFs (`application/pdf`)** | `258` tokens / page | `800` tokens / page | `2,250` tokens / page *(text + page image)* | `512` tokens / page |
+
+> [!NOTE]
+> **Disclaimer — Deterministic Local Pre-Flight Estimation vs. Exact Post-Call Billing**:
+> Pre-flight token checking (`before_model_callback`) is a **deterministic local estimation** derived from [`PROVIDER_TOKEN_PROFILES`](src/adk_finops/token_profiles.py) (character/symbol density heuristics, exact PDF `/Type /Page` marker counting, and documented provider multimodal/tool preambles). It is intentionally designed to run in **`< 0.5ms` in-process** without adding network latency from external `/count_tokens` API round-trips before every LLM call. Because it is a deterministic profile-based heuristic, pre-flight token estimates may vary by **±5–10%** from the provider's remote tokenizer. **Actual ledger accounting and billing (`after_model_callback`) always use the exact token counts (`usage_metadata`) returned by the LLM provider.**
+
+#### Customizing or Registering Provider Token Profiles
+Just like pricing rate cards, you can register a new provider/model tokenization profile or override specific fields on existing providers programmatically, via `FinOpsCostPlugin(token_profiles=..., token_profiles_path=...)`, or via `ADK_FINOPS_TOKEN_PROFILES_PATH`:
+
+```python
+from adk_finops import CostTracker, register_token_profile, update_token_profile
+
+# 1. Register a brand-new provider profile (inherits missing defaults from base_provider)
+register_token_profile("mistral", {
+    "ascii_chars_per_token": 3.8,
+    "tool_System_preamble_tokens": 24,
+    "image_tokens": 512,
+    "pdf_page_tokens": 750,
+})
+
+# 2. Partially override an existing provider (merges nested dicts automatically)
+update_token_profile("anthropic", {
+    "pdf_page_tokens": 2500,
+    "tool_System_preamble_tokens": {"opus_5.5_auto_or_none": 300},
+    ..
+})
+
+# 3. Or via CostTracker / FinOpsCostPlugin
+CostTracker.register_token_profile("meta-llama", {"ascii_chars_per_token": 3.9, ..})
+```
+
 ### Enforcement Modes
 
-| Mode | Behavior | Best Used For |
+| Mode | Pre-Flight (`before_model_callback`) & Post-Call Behavior | Best Used For |
 | :--- | :--- | :--- |
-| **`"halt"`** *(default)* | Halts execution immediately, raises `BudgetExceededError` or returns a safe warning message in ADK to block further model calls. | Production safeguards, preventing runaway costs. |
-| **`"downgrade"`** | Automatically downgrades the agent's model to `fallback_model` (e.g. Gemini 2.5 Pro → Flash) once the budget threshold is reached. | Graceful service degradation with zero user downtime. |
-| **`"warn"`** | Logs a warning and marks `exceeded: True` in session state (`finops_cost.budget`) without interrupting the user. | Soft monitoring and alerting. |
+| **`"halt"`** *(default)* | Short-circuits `before_model_callback` by returning a safe `LlmResponse` **before** the network request is sent (`$0.00` cloud cost), or halts subsequent calls if breached mid-turn. | Production safeguards, blocking massive 200K+ token dumps before they are billed. |
+| **`"downgrade"`** | Mutates `llm_request.model = fallback_model` (e.g. `gemini-2.5-pro` ➔ `gemini-2.5-flash`) **in-place before the request leaves the process** so the current call immediately executes at the lower rate. | Graceful service degradation with zero user downtime. |
+| **`"warn"`** | Logs a `[FinOps Pre-Flight Guard] Warning` with projected cost and marks `exceeded: True` in session state (`finops_cost.budget`) without interrupting execution. | Soft monitoring and alerting. |
 
 ---
 
@@ -863,6 +910,8 @@ print(f"Total Tokens: {summary['total_tokens']}")
 | `ADK_FINOPS_EFFECTIVE_DATE` | `str` | ISO date (`YYYY-MM-DD`) to evaluate date-tiered pricing such as `standard_pricing_2027` (defaults to today's date). |
 | `ADK_FINOPS_RATE_CARD_PATH` | `str` | Absolute or relative path to a custom JSON rate card file. |
 | `ADK_FINOPS_DISCOUNT_PERCENT` | `float` | Global enterprise discount percentage (e.g., `15.0` for 15%). |
+| `ADK_FINOPS_MAX_PROMPT_TOKENS` | `int` | Hard pre-flight ceiling on estimated input prompt tokens per LLM call (e.g., `200000`). |
+| `ADK_FINOPS_PREFLIGHT_GUARD` | `bool` | Enable or disable pre-flight token & budget estimation in `before_model_callback` (`"true"` or `"false"`, default `"true"`). |
 | `ADK_FINOPS_OPTIMIZATION_ADVISOR` | `bool` | Toggle the Automated FinOps Optimization Advisor (`"true"` or `"false"`). |
 
 ### Plugin Initialization Parameters
@@ -880,6 +929,8 @@ FinOpsCostPlugin(
     budget_limit_usd: float | None = None,
     turn_budget_limit_usd: float | None = None,
     agent_budgets: dict[str, float] | None = None,
+    max_prompt_tokens: int | None = None,
+    preflight_budget_guard: bool = True,
     on_budget_exceeded: str = "halt",  # "halt", "warn", or "downgrade"
     fallback_model: str = "gemini-2.5-flash",
     render_terminal_box: bool = True,
@@ -898,7 +949,9 @@ FinOpsCostPlugin(
 | `budget_limit_usd` | `float` | `None` | Maximum cumulative spending limit in USD for the entire chat session. |
 | `turn_budget_limit_usd` | `float` | `None` | Maximum spending limit in USD for any single user turn. |
 | `agent_budgets` | `dict[str, float]` | `None` | Per-agent spending caps in USD (e.g. `{"researcher": 0.50, "coder": 1.00}`). |
-| `on_budget_exceeded` | `str` | `"halt"` | Action on budget breach: `"halt"` (raise/block), `"warn"`, or `"downgrade"`. |
+| `max_prompt_tokens` | `int` | `None` | Optional hard cap on estimated input prompt tokens per LLM call (e.g. `200_000` to block `>200K` tier charges). |
+| `preflight_budget_guard` | `bool` | `True` | Estimates input tokens and projected cost in `before_model_callback` before sending the LLM request. |
+| `on_budget_exceeded` | `str` | `"halt"` | Action on budget breach: `"halt"` (short-circuit/block), `"warn"`, or `"downgrade"` (in-place model switch). |
 | `fallback_model` | `str` | `"gemini-2.5-flash"` | Target model when using `"downgrade"` mode. |
 | `render_terminal_box` | `bool` | `True` | Renders a beautiful color-coded summary box to stdout at the end of each turn. |
 | `enable_optimization_advisor` | `bool` | `True` | Enables deterministic FinOps Optimization Insights in the summary box and `get_summary()`. |
@@ -1274,12 +1327,6 @@ WHERE scope = 'session'
 GROUP BY 1, 2
 ORDER BY total_spend_usd DESC;
 ```
-
----
-
-## Limitations & Roadmap (Next Release)
-
-- **Pre-Flight Budget Guards**: Budget checks currently evaluate reactively after calls finish; future releases would add pre-flight token estimation to block massive requests before the network call occurs.
 
 ---
 

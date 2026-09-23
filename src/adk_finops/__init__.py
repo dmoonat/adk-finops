@@ -28,7 +28,18 @@ from .billable import (
     extract_billable_spec,
     is_error_tool_result,
 )
+from .estimator import estimate_request_tokens, estimate_text_tokens
 from .rate_card import ModelRate, RateCardRegistry
+from .token_profiles import (
+    DEFAULT_PROVIDER_TOKEN_PROFILES,
+    PROVIDER_TOKEN_PROFILES,
+    TokenProfileRegistry,
+    get_token_profile,
+    load_token_profiles_file,
+    register_token_profile,
+    reset_token_profiles,
+    update_token_profile,
+)
 from .tracker import BudgetExceededError, CostTracker
 
 try:
@@ -40,9 +51,19 @@ try:
         "FinOpsCostPlugin",
         "RateCardRegistry",
         "ModelRate",
+        "TokenProfileRegistry",
+        "PROVIDER_TOKEN_PROFILES",
+        "DEFAULT_PROVIDER_TOKEN_PROFILES",
+        "register_token_profile",
+        "update_token_profile",
+        "get_token_profile",
+        "load_token_profiles_file",
+        "reset_token_profiles",
         "BillableToolSpec",
         "billable",
         "extract_billable_spec",
+        "estimate_request_tokens",
+        "estimate_text_tokens",
         "print_summary",
         "format_summary_box",
         "print_task_efficiency_summary",
@@ -55,9 +76,19 @@ except ImportError:
         "BudgetExceededError",
         "RateCardRegistry",
         "ModelRate",
+        "TokenProfileRegistry",
+        "PROVIDER_TOKEN_PROFILES",
+        "DEFAULT_PROVIDER_TOKEN_PROFILES",
+        "register_token_profile",
+        "update_token_profile",
+        "get_token_profile",
+        "load_token_profiles_file",
+        "reset_token_profiles",
         "BillableToolSpec",
         "billable",
         "extract_billable_spec",
+        "estimate_request_tokens",
+        "estimate_text_tokens",
         "print_summary",
         "format_summary_box",
         "print_task_efficiency_summary",

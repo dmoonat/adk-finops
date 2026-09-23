@@ -193,6 +193,54 @@ class CostTracker:
         cls._registry.register_tool(tool_name, cost_per_call_usd)
 
     @classmethod
+    def register_token_profile(
+        cls,
+        provider_or_model: str,
+        profile: dict[str, Any],
+        *,
+        merge: bool = True,
+        base_provider: str = "google",
+    ) -> dict[str, Any]:
+        """Registers a new provider/model token profile or updates an existing one for pre-flight estimation."""
+        from .token_profiles import TokenProfileRegistry
+
+        return TokenProfileRegistry.register(
+            provider_or_model, profile, merge=merge, base_provider=base_provider
+        )
+
+    @classmethod
+    def update_token_profile(
+        cls, provider_or_model: str, updates: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Updates specific keys in an existing provider/model token profile."""
+        from .token_profiles import TokenProfileRegistry
+
+        return TokenProfileRegistry.update(provider_or_model, updates)
+
+    @classmethod
+    def get_token_profile(
+        cls, provider_or_model: str, default_provider: str = "google"
+    ) -> dict[str, Any]:
+        """Retrieves a provider/model token profile."""
+        from .token_profiles import TokenProfileRegistry
+
+        return TokenProfileRegistry.get(provider_or_model, default_provider=default_provider)
+
+    @classmethod
+    def load_token_profiles_file(cls, file_path: str | Path, *, merge: bool = True) -> None:
+        """Loads provider/model token profiles from a local JSON file."""
+        from .token_profiles import TokenProfileRegistry
+
+        TokenProfileRegistry.load_from_file(file_path, merge=merge)
+
+    @classmethod
+    def reset_token_profiles(cls) -> None:
+        """Resets all provider token profiles back to built-in defaults."""
+        from .token_profiles import TokenProfileRegistry
+
+        TokenProfileRegistry.reset()
+
+    @classmethod
     def set_discount(cls, discount_percent: float, provider: str | None = None) -> None:
         """Sets enterprise discount percentage (globally or for a specific provider)."""
         if provider:
@@ -227,8 +275,9 @@ class CostTracker:
         session_budget_usd: float | None = None,
         turn_budget_usd: float | None = None,
         agent_budgets: dict[str, float] | None = None,
+        max_prompt_tokens: int | None = None,
     ) -> None:
-        """Configures budget limits in USD globally or for a specific session/agent."""
+        """Configures budget limits in USD and optional max_prompt_tokens globally or for a specific session/agent."""
         eff_session_limit = session_limit_usd if session_limit_usd is not None else session_budget_usd
         eff_turn_limit = turn_limit_usd if turn_limit_usd is not None else turn_budget_usd
         eff_agent_limits = agent_limits_usd if agent_limits_usd is not None else agent_budgets
@@ -243,6 +292,8 @@ class CostTracker:
                 current_agents = target.setdefault("agents", {})
                 for a_name, a_limit in eff_agent_limits.items():
                     current_agents[a_name] = float(a_limit)
+            if max_prompt_tokens is not None:
+                target["max_prompt_tokens"] = int(max_prompt_tokens)
 
     @classmethod
     def get_budget(cls, session_id: str | None = None) -> dict[str, Any]:
@@ -256,6 +307,9 @@ class CostTracker:
                 "session": sess_budget.get("session", cls._global_budget.get("session")),
                 "turn": sess_budget.get("turn", cls._global_budget.get("turn")),
                 "agents": merged_agents,
+                "max_prompt_tokens": sess_budget.get(
+                    "max_prompt_tokens", cls._global_budget.get("max_prompt_tokens")
+                ),
             }
 
     @classmethod
@@ -346,6 +400,207 @@ class CostTracker:
             "utilization_pct": utilization,
         }
         return False, None, status
+
+    @classmethod
+    def check_preflight_budget(
+        cls,
+        model_name: str,
+        estimated_prompt_tokens: int,
+        estimated_output_tokens: int = 0,
+        estimated_cached_tokens: int = 0,
+        run_id: str | None = None,
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        max_prompt_tokens_override: int | None = None,
+    ) -> tuple[bool, str | None, dict[str, Any]]:
+        """Pre-flight check before an LLM call is sent over the network.
+
+        Computes the estimated cost of the outgoing prompt (`estimated_call_cost_usd`)
+        and checks whether `current_cost_usd + estimated_call_cost_usd` would breach
+        the configured `max_prompt_tokens`, `agent_budgets`, `session_budget`, or `turn_budget`.
+
+        Returns: (is_exceeded, reason_str, preflight_status_dict)
+        """
+        budget_info = cls.get_budget(session_id)
+        session_limit = budget_info.get("session")
+        turn_limit = budget_info.get("turn")
+        agent_limits: dict[str, float] = budget_info.get("agents", {})
+        max_prompt_tokens = (
+            max_prompt_tokens_override
+            if max_prompt_tokens_override is not None
+            else budget_info.get("max_prompt_tokens")
+        )
+
+        est_call_cost, est_gross_cost, _ = cls.calculate_call_cost_and_savings(
+            model_name=model_name,
+            prompt_tokens=max(0, int(estimated_prompt_tokens)),
+            completion_tokens=max(0, int(estimated_output_tokens)),
+            cached_tokens=max(0, int(estimated_cached_tokens)),
+        )
+
+        with cls._lock:
+            sess_cost = 0.0
+            agent_cost = 0.0
+            if session_id and session_id in cls._active_runs:
+                sess_run = cls._active_runs[session_id]
+                sess_cost = sess_run.get("total_cost_usd", 0.0)
+                if agent_name and "breakdown_by_agent" in sess_run:
+                    agent_cost = sess_run["breakdown_by_agent"].get(agent_name, {}).get("total_cost_usd", 0.0)
+
+            turn_cost = 0.0
+            if run_id and run_id in cls._active_runs:
+                turn_run = cls._active_runs[run_id]
+                turn_cost = turn_run.get("total_cost_usd", 0.0)
+                if agent_name and not agent_cost and "breakdown_by_agent" in turn_run:
+                    agent_cost = turn_run["breakdown_by_agent"].get(agent_name, {}).get("total_cost_usd", 0.0)
+
+        projected_sess_cost = round(sess_cost + est_call_cost, 7)
+        projected_turn_cost = round(turn_cost + est_call_cost, 7)
+        projected_agent_cost = round(agent_cost + est_call_cost, 7)
+
+        base_meta = {
+            "model": model_name,
+            "agent_name": agent_name,
+            "estimated_prompt_tokens": int(estimated_prompt_tokens),
+            "estimated_cached_tokens": int(estimated_cached_tokens),
+            "estimated_call_cost_usd": est_call_cost,
+            "estimated_gross_cost_usd": est_gross_cost,
+            "current_session_cost_usd": sess_cost,
+            "current_turn_cost_usd": turn_cost,
+            "current_agent_cost_usd": agent_cost,
+            "projected_session_cost_usd": projected_sess_cost,
+            "projected_turn_cost_usd": projected_turn_cost,
+            "projected_agent_cost_usd": projected_agent_cost,
+            "max_prompt_tokens": max_prompt_tokens,
+        }
+
+        # 1. Check max_prompt_tokens ceiling
+        if max_prompt_tokens is not None and estimated_prompt_tokens > max_prompt_tokens:
+            reason = (
+                f"Pre-flight prompt token limit of {max_prompt_tokens:,} exceeded "
+                f"(estimated input: {estimated_prompt_tokens:,} tokens on {model_name}, "
+                f"est. call cost: ${est_call_cost:.4f})"
+            )
+            status = {
+                **base_meta,
+                "exceeded": True,
+                "scope": "max_prompt_tokens",
+                "current_cost_usd": sess_cost,
+                "projected_cost_usd": projected_sess_cost,
+                "budget_limit_usd": session_limit or turn_limit,
+                "utilization_pct": round((estimated_prompt_tokens / max_prompt_tokens) * 100, 1)
+                if max_prompt_tokens > 0
+                else 100.0,
+            }
+            return True, reason, status
+
+        # 2. Check agent limit
+        if agent_name and agent_name in agent_limits:
+            agent_limit = agent_limits[agent_name]
+            if projected_agent_cost >= agent_limit:
+                reason = (
+                    f"Pre-flight Agent '{agent_name}' budget limit of ${agent_limit:.4f} would be exceeded "
+                    f"(current: ${agent_cost:.4f} + est. call: ${est_call_cost:.4f} = projected: ${projected_agent_cost:.4f}; "
+                    f"est. input: {estimated_prompt_tokens:,} tokens on {model_name})"
+                )
+                status = {
+                    **base_meta,
+                    "exceeded": True,
+                    "scope": "agent",
+                    "current_cost_usd": agent_cost,
+                    "projected_cost_usd": projected_agent_cost,
+                    "budget_limit_usd": agent_limit,
+                    "utilization_pct": round((projected_agent_cost / agent_limit) * 100, 1)
+                    if agent_limit > 0
+                    else 100.0,
+                }
+                return True, reason, status
+
+        # 3. Check session limit
+        if session_limit is not None and projected_sess_cost >= session_limit:
+            reason = (
+                f"Pre-flight Session budget limit of ${session_limit:.4f} would be exceeded "
+                f"(current: ${sess_cost:.4f} + est. call: ${est_call_cost:.4f} = projected: ${projected_sess_cost:.4f}; "
+                f"est. input: {estimated_prompt_tokens:,} tokens on {model_name})"
+            )
+            status = {
+                **base_meta,
+                "exceeded": True,
+                "scope": "session",
+                "current_cost_usd": sess_cost,
+                "projected_cost_usd": projected_sess_cost,
+                "budget_limit_usd": session_limit,
+                "utilization_pct": round((projected_sess_cost / session_limit) * 100, 1)
+                if session_limit > 0
+                else 100.0,
+            }
+            return True, reason, status
+
+        # 4. Check turn limit
+        if turn_limit is not None and projected_turn_cost >= turn_limit:
+            reason = (
+                f"Pre-flight Turn budget limit of ${turn_limit:.4f} would be exceeded "
+                f"(current: ${turn_cost:.4f} + est. call: ${est_call_cost:.4f} = projected: ${projected_turn_cost:.4f}; "
+                f"est. input: {estimated_prompt_tokens:,} tokens on {model_name})"
+            )
+            status = {
+                **base_meta,
+                "exceeded": True,
+                "scope": "turn",
+                "current_cost_usd": turn_cost,
+                "projected_cost_usd": projected_turn_cost,
+                "budget_limit_usd": turn_limit,
+                "utilization_pct": round((projected_turn_cost / turn_limit) * 100, 1)
+                if turn_limit > 0
+                else 100.0,
+            }
+            return True, reason, status
+
+        utilization = 0.0
+        if agent_name and agent_name in agent_limits and agent_limits[agent_name] > 0:
+            utilization = round((projected_agent_cost / agent_limits[agent_name]) * 100, 1)
+        elif session_limit and session_limit > 0:
+            utilization = round((projected_sess_cost / session_limit) * 100, 1)
+        elif turn_limit and turn_limit > 0:
+            utilization = round((projected_turn_cost / turn_limit) * 100, 1)
+
+        status = {
+            **base_meta,
+            "exceeded": False,
+            "scope": None,
+            "current_cost_usd": sess_cost if session_limit else turn_cost,
+            "projected_cost_usd": projected_sess_cost if session_limit else projected_turn_cost,
+            "budget_limit_usd": session_limit or turn_limit,
+            "utilization_pct": utilization,
+        }
+        return False, None, status
+
+    @classmethod
+    def record_preflight_event(
+        cls,
+        run_id: str | None,
+        session_id: str | None,
+        action: str,
+        estimated_prompt_tokens: int,
+        avoided_cost_usd: float,
+    ) -> None:
+        """Records pre-flight blocks or downgrades onto the turn and session runs."""
+        target_ids = [tid for tid in (run_id, session_id) if tid]
+        with cls._lock:
+            for tid in set(target_ids):
+                if tid not in cls._active_runs:
+                    cls._active_runs[tid] = cls._create_empty_run(tid)
+                run = cls._active_runs[tid]
+                if action == "blocked":
+                    run["preflight_blocks_count"] = run.get("preflight_blocks_count", 0) + 1
+                elif action == "downgraded":
+                    run["preflight_downgrades_count"] = run.get("preflight_downgrades_count", 0) + 1
+                run["preflight_avoided_tokens"] = run.get("preflight_avoided_tokens", 0) + max(
+                    0, int(estimated_prompt_tokens)
+                )
+                run["preflight_avoided_cost_usd"] = round(
+                    run.get("preflight_avoided_cost_usd", 0.0) + max(0.0, float(avoided_cost_usd)), 7
+                )
 
     @classmethod
     def calculate_call_cost(
