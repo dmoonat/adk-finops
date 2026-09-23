@@ -61,6 +61,13 @@ from .exporters import (
     OpenTelemetryExporter,
 )
 
+from .pricing_extractor import (
+    GoogleCloudPricingExtractor,
+    PricingDiffReport,
+    extract_and_sync_pricing,
+    print_pricing_diff_report,
+)
+
 __all__.extend(
     [
         "BaseExporter",
@@ -72,6 +79,10 @@ __all__.extend(
         "start_background_dashboard",
         "generate_optimization_insights",
         "ADVISOR_DISCLAIMER",
+        "GoogleCloudPricingExtractor",
+        "PricingDiffReport",
+        "extract_and_sync_pricing",
+        "print_pricing_diff_report",
     ]
 )
 

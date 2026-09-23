@@ -206,5 +206,110 @@ def test_unrecognized_model_logs_warning_and_marks_fallback_rate(capsys) -> None
     assert rec_registered["cost_usd"] == 1.50
 
 
+def test_remote_rate_card_sync_with_cache_and_offline_fallback(tmp_path: Path, monkeypatch) -> None:
+    """Verifies dynamic remote rate card syncing, 24h local disk cache TTL, and offline fallback."""
+    cache_file = tmp_path / "remote_rates.json"
+    reg = RateCardRegistry()
+
+    fake_remote_payload = {
+        "models": {
+            "gemini-4.0-ultra-preview": {
+                "provider": "google",
+                "input_per_1m": 3.50,
+                "output_per_1m": 14.00,
+                "cached_input_per_1m": 0.35,
+            }
+        },
+        "tools": {"custom_search_tool": 0.005},
+    }
+
+    def mock_load_from_url(url: str, timeout_seconds: float = 5.0):
+        reg.load_from_dict(fake_remote_payload)
+        return fake_remote_payload
+
+    monkeypatch.setattr(reg, "load_from_url", mock_load_from_url)
+
+    # 1. Initial forced sync fetches from remote URL and populates local cache
+    status_sync = reg.sync_remote_rate_card(
+        url="https://example.com/rates.json",
+        cache_path=cache_file,
+        cache_ttl_seconds=86400,
+        force=True,
+    )
+    assert status_sync["status"] == "synced"
+    assert cache_file.exists()
+    rate = reg.resolve_model("gemini-4.0-ultra-preview")
+    assert rate.input_per_1m == 3.50
+    assert rate.is_fallback is False
+
+    # 2. Second sync within TTL loads from local disk cache without hitting load_from_url
+    def fail_if_called(url: str, timeout_seconds: float = 5.0):
+        raise RuntimeError("Should not hit network when local cache is fresh!")
+
+    monkeypatch.setattr(reg, "load_from_url", fail_if_called)
+    status_cached = reg.sync_remote_rate_card(
+        url="https://example.com/rates.json",
+        cache_path=cache_file,
+        cache_ttl_seconds=86400,
+        force=False,
+    )
+    assert status_cached["status"] == "cached"
+    assert status_cached["models_loaded"] == 1
+
+    # 3. Forced sync when offline falls back gracefully to stale_cache_fallback
+    status_offline = reg.sync_remote_rate_card(
+        url="https://example.com/rates.json",
+        cache_path=cache_file,
+        cache_ttl_seconds=86400,
+        force=True,
+    )
+    assert status_offline["status"] == "stale_cache_fallback"
+
+
+def test_pricing_extractor_merges_and_preserves_curated_fields(monkeypatch) -> None:
+    """Verifies GoogleCloudPricingExtractor merges upstream feeds while preserving non_global, 2027, and _gt_200k."""
+    from adk_finops.pricing_extractor import GoogleCloudPricingExtractor
+
+    extractor = GoogleCloudPricingExtractor(include_new_models=True)
+    # Mock network calls so unit test runs offline deterministically
+    monkeypatch.setattr(
+        extractor,
+        "extract_from_litellm_registry",
+        lambda: (
+            {
+                "gpt-4o": {
+                    "provider": "openai",
+                    "input_per_1m": 2.50,
+                    "output_per_1m": 10.00,
+                    "cached_input_per_1m": 1.25,
+                },
+                "gpt-4.1": {
+                    "provider": "openai",
+                    "input_per_1m": 2.00,
+                    "output_per_1m": 8.00,
+                    "cached_input_per_1m": 0.50,
+                },
+            },
+            True,
+        ),
+    )
+    monkeypatch.setattr(
+        extractor,
+        "extract_from_google_pricing_pages",
+        lambda *args, **kwargs: ({}, ["gemini_enterprise_pricing"]),
+    )
+
+    report = extractor.build_merged_rate_card()
+    assert "gpt-4.1" in report.added_models
+    assert len(report.merged_rate_card["source_urls"]) == 2
+    source_names = [s["name"] for s in report.merged_rate_card["sources"]]
+    assert source_names == ["gemini_enterprise_pricing", "litellm_registry"]
+    models = report.merged_rate_card["models"]
+    assert "non_global" in models["gemini-3.7-flash"]
+    assert "standard_pricing_2027" in models["gemini-3.7-flash"]
+    assert models["gemini-3.1-pro-preview"]["input_per_1m_gt_200k"] == 4.00
+
+
+
 
 

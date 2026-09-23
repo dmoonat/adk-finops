@@ -1196,16 +1196,17 @@ def start_background_dashboard(
 
 
 def cli_main() -> None:
-    """CLI entrypoint for `adk-finops dashboard` or `python -m adk_finops.dashboard`."""
+    """CLI entrypoint for `adk-finops` (`dashboard`, `sync-rates`, `extract-pricing`)."""
     parser = argparse.ArgumentParser(
         prog="adk-finops",
-        description="ADK FinOps Near-Live Cost & Token Dashboard",
+        description="ADK FinOps CLI: Near-Live Dashboard, Dynamic Remote Rate Card Sync & Google Cloud Pricing Extractor",
     )
     parser.add_argument(
         "command",
         nargs="?",
         default="dashboard",
-        help="Command to execute (default: dashboard)",
+        choices=["dashboard", "sync-rates", "extract-pricing"],
+        help="Command to execute: 'dashboard' (default), 'sync-rates', or 'extract-pricing'",
     )
     parser.add_argument(
         "--port",
@@ -1231,7 +1232,76 @@ def cli_main() -> None:
         default=os.getenv("ADK_FINOPS_BIGQUERY_TABLE"),
         help="Optional BigQuery table ID (project.dataset.table) for historical + cloud sync",
     )
+    # Rate card sync & pricing extraction flags
+    parser.add_argument(
+        "--url",
+        type=str,
+        default=None,
+        help="Remote rate card URL for 'sync-rates'",
+    )
+    parser.add_argument(
+        "--cache-path",
+        type=str,
+        default=None,
+        help="Local cache file path for 'sync-rates'",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass local 24h cache TTL and force a fresh remote fetch in 'sync-rates'",
+    )
+    parser.add_argument(
+        "--update-default",
+        action="store_true",
+        help="Update bundled src/adk_finops/rates/default_rates.json during 'extract-pricing'",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Output JSON path for 'extract-pricing'",
+    )
+    parser.add_argument(
+        "--include-new-models",
+        action="store_true",
+        help="Also discover and add new flagship models during 'extract-pricing'",
+    )
+    parser.add_argument(
+        "--gcp-api-key",
+        type=str,
+        default=None,
+        help="Optional Google Cloud Billing Catalog API key for 'extract-pricing'",
+    )
     args = parser.parse_args()
+
+    if args.command == "sync-rates":
+        res = CostTracker.sync_remote_rate_card(
+            url=args.url,
+            cache_path=args.cache_path,
+            force=args.force,
+        )
+        print("\n🔄 ADK FinOps — Dynamic Remote Rate Card Sync")
+        print(f"   • Status:        {res.get('status')}")
+        print(f"   • Source:        {res.get('source')}")
+        if res.get("cache_path"):
+            print(f"   • Local Cache:   {res.get('cache_path')}")
+        print(f"   • Models Loaded: {res.get('models_loaded')}")
+        if res.get("error"):
+            print(f"   • Fallback Note: {res.get('error')}")
+        print()
+        return
+
+    if args.command == "extract-pricing":
+        from .pricing_extractor import extract_and_sync_pricing
+
+        extract_and_sync_pricing(
+            update_default=args.update_default,
+            output_path=args.output,
+            include_new_models=args.include_new_models,
+            gcp_billing_api_key=args.gcp_api_key,
+            print_report=True,
+        )
+        return
 
     import uvicorn
 

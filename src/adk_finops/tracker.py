@@ -163,6 +163,26 @@ class CostTracker:
         cls._registry.load_from_url(url)
 
     @classmethod
+    def sync_remote_rate_card(
+        cls,
+        url: str | None = None,
+        cache_path: str | None = None,
+        cache_ttl_seconds: int | None = None,
+        force: bool = False,
+        timeout_seconds: float = 4.0,
+        background: bool = False,
+    ) -> dict[str, Any]:
+        """Dynamically syncs the rate card from a remote JSON endpoint with local disk caching (24h TTL) and offline fallback."""
+        return cls._registry.sync_remote_rate_card(
+            url=url,
+            cache_path=cache_path,
+            cache_ttl_seconds=cache_ttl_seconds,
+            force=force,
+            timeout_seconds=timeout_seconds,
+            background=background,
+        )
+
+    @classmethod
     def register_rate_card(cls, model_name: str, rate_card: dict[str, Any] | ModelRate) -> None:
         """Registers or overrides a pricing rate card for a model."""
         cls._registry.register_model(model_name, rate_card)

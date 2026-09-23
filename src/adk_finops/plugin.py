@@ -54,6 +54,9 @@ class FinOpsCostPlugin(BasePlugin):
         default_model: str = "gemini-2.5-flash",
         rate_card_path: str | Path | None = None,
         rate_card: dict[str, Any] | None = None,
+        sync_remote_rates: bool = False,
+        remote_rate_card_url: str | None = None,
+        remote_cache_ttl_seconds: int | None = None,
         discount_percent: float | None = None,
         region: str | None = None,
         effective_date: str | None = None,
@@ -178,8 +181,25 @@ class FinOpsCostPlugin(BasePlugin):
         CostTracker.set_region(region)
         if effective_date is not None:
             CostTracker.set_effective_date(effective_date)
+
+        env_sync_rates = os.getenv("ADK_FINOPS_SYNC_REMOTE_RATES", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        env_remote_url = os.getenv("ADK_FINOPS_REMOTE_RATE_CARD_URL", "").strip()
+        if sync_remote_rates or env_sync_rates or remote_rate_card_url or env_remote_url:
+            CostTracker.sync_remote_rate_card(
+                url=remote_rate_card_url or (env_remote_url if env_remote_url else None),
+                cache_ttl_seconds=remote_cache_ttl_seconds,
+            )
+
         if rate_card_path:
-            CostTracker.load_rate_card_file(str(rate_card_path))
+            if str(rate_card_path).startswith(("http://", "https://")):
+                CostTracker.load_rate_card_url(str(rate_card_path))
+            else:
+                CostTracker.load_rate_card_file(str(rate_card_path))
         elif rate_card:
             CostTracker.get_registry().load_from_dict(rate_card)
 

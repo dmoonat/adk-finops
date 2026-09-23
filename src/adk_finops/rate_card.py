@@ -26,9 +26,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import ssl
 import threading
+import time
 import urllib.request
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +39,22 @@ from ._version import __version__
 from .rates import DEFAULT_RATES_FILE
 
 logger = logging.getLogger("adk_finops.rate_card")
+
+DEFAULT_REMOTE_RATE_CARD_URL = (
+    "https://raw.githubusercontent.com/dmoonat/adk-finops/main/src/adk_finops/rates/default_rates.json"
+)
+DEFAULT_REMOTE_CACHE_TTL_SECONDS = 86400  # 24 hours
+DEFAULT_REMOTE_CACHE_PATH = Path.home() / ".cache" / "adk-finops" / "remote_rates.json"
+
+
+def _create_ssl_context() -> ssl.SSLContext:
+    """Creates an SSL context using certifi CA bundle if available."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
 
 
 def _resolve_region(explicit_region: str | None = None) -> str:
@@ -152,6 +171,10 @@ class RateCardRegistry:
         load_defaults: bool = True,
         region: str | None = None,
         effective_date: Any = None,
+        sync_remote_rates: bool | None = None,
+        remote_url: str | None = None,
+        remote_cache_ttl_seconds: int | None = None,
+        remote_cache_path: str | Path | None = None,
     ) -> None:
         self._lock = threading.RLock()
         self._raw_models: dict[str, dict[str, Any]] = {}
@@ -164,15 +187,35 @@ class RateCardRegistry:
         self._explicit_region: str | None = region.strip().lower() if region else None
         self._region: str = _resolve_region(self._explicit_region)
         self._effective_date: Any = effective_date or os.environ.get("ADK_FINOPS_EFFECTIVE_DATE")
+        self._last_sync_status: dict[str, Any] = {"status": "bundled_default"}
 
         if load_defaults:
             self.load_defaults()
+
+        # Opt-in dynamic remote rate card syncing (via parameter or ADK_FINOPS_SYNC_REMOTE_RATES=1)
+        env_sync = os.environ.get("ADK_FINOPS_SYNC_REMOTE_RATES", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        env_remote_url = os.environ.get("ADK_FINOPS_REMOTE_RATE_CARD_URL", "").strip()
+        should_sync = bool(sync_remote_rates) or env_sync or bool(remote_url) or bool(env_remote_url)
+        if should_sync:
+            self.sync_remote_rate_card(
+                url=remote_url or (env_remote_url if env_remote_url else None),
+                cache_path=remote_cache_path,
+                cache_ttl_seconds=remote_cache_ttl_seconds,
+            )
 
         # Check environment variable for auto-configuration
         env_path = os.environ.get("ADK_FINOPS_RATE_CARD_PATH")
         if env_path:
             try:
-                self.load_from_file(env_path)
+                if env_path.startswith(("http://", "https://")):
+                    self.load_from_url(env_path)
+                else:
+                    self.load_from_file(env_path)
             except Exception as e:
                 logger.warning(f"Failed to load rate card from ADK_FINOPS_RATE_CARD_PATH ({env_path}): {e}")
 
@@ -269,17 +312,169 @@ class RateCardRegistry:
             self.load_from_dict(data)
             logger.info(f"Loaded custom rate card from {file_path}")
 
-    def load_from_url(self, url: str, timeout_seconds: float = 5.0) -> None:
+    def load_from_url(self, url: str, timeout_seconds: float = 5.0) -> dict[str, Any]:
         """Fetches and loads rate cards from a remote HTTP/HTTPS URL."""
         req = urllib.request.Request(
             url,
             headers={"User-Agent": f"adk-finops/{__version__}"},
         )
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+        with urllib.request.urlopen(req, timeout=timeout_seconds, context=_create_ssl_context()) as response:
             content = response.read().decode("utf-8")
             data = json.loads(content)
             self.load_from_dict(data)
             logger.info(f"Loaded custom rate card from URL: {url}")
+            return data
+
+    def sync_remote_rate_card(
+        self,
+        url: str | None = None,
+        cache_path: str | Path | None = None,
+        cache_ttl_seconds: int | None = None,
+        force: bool = False,
+        timeout_seconds: float = 4.0,
+        background: bool = False,
+    ) -> dict[str, Any]:
+        """Dynamically syncs the rate card from a remote JSON endpoint with local disk caching (24h TTL) and offline fallback.
+
+        Args:
+            url: Remote JSON URL (defaults to ADK_FINOPS_REMOTE_RATE_CARD_URL or canonical GitHub raw default_rates.json).
+            cache_path: Local disk cache path (defaults to ~/.cache/adk-finops/remote_rates.json).
+            cache_ttl_seconds: Cache freshness TTL in seconds (defaults to 86400s / 24h).
+            force: If True, bypasses the local cache TTL and fetches fresh rates from the remote URL.
+            timeout_seconds: HTTP request timeout in seconds.
+            background: If True, performs the remote sync asynchronously in a daemon thread.
+
+        Returns:
+            Status dictionary describing whether rates were loaded from 'cached', 'synced', 'stale_cache_fallback', or 'bundled_fallback'.
+        """
+        target_url = (
+            url
+            or os.environ.get("ADK_FINOPS_REMOTE_RATE_CARD_URL", "").strip()
+            or DEFAULT_REMOTE_RATE_CARD_URL
+        )
+        target_cache = Path(
+            cache_path
+            or os.environ.get("ADK_FINOPS_REMOTE_CACHE_PATH", "").strip()
+            or DEFAULT_REMOTE_CACHE_PATH
+        )
+        ttl = (
+            cache_ttl_seconds
+            if cache_ttl_seconds is not None
+            else int(os.environ.get("ADK_FINOPS_REMOTE_CACHE_TTL", str(DEFAULT_REMOTE_CACHE_TTL_SECONDS)))
+        )
+
+        def _do_sync() -> dict[str, Any]:
+            now = time.time()
+            # 1. Check fresh local cache if not forced
+            if not force and target_cache.exists():
+                try:
+                    with open(target_cache, encoding="utf-8") as f:
+                        cached_data = json.load(f)
+                    meta = cached_data.get("_sync_metadata", {})
+                    fetched_at = float(meta.get("fetched_at_epoch") or target_cache.stat().st_mtime)
+                    age = now - fetched_at
+                    if age < ttl and isinstance(cached_data.get("models"), dict):
+                        self.load_from_dict(cached_data)
+                        status = {
+                            "status": "cached",
+                            "source": str(target_cache),
+                            "url": target_url,
+                            "models_loaded": len(cached_data.get("models", {})),
+                            "tools_loaded": len(cached_data.get("tools", {})),
+                            "age_seconds": round(age, 1),
+                            "ttl_seconds": ttl,
+                        }
+                        self._last_sync_status = status
+                        logger.info(
+                            f"[FinOps Rate Card] Loaded {status['models_loaded']} models from fresh local cache ({target_cache}, age={status['age_seconds']}s)"
+                        )
+                        return status
+                except Exception as e:
+                    logger.debug(f"[FinOps Rate Card] Could not read cache file {target_cache}: {e}")
+
+            # 2. Fetch from remote URL
+            try:
+                data = self.load_from_url(target_url, timeout_seconds=timeout_seconds)
+                if not isinstance(data.get("models"), dict):
+                    raise ValueError(f"Remote rate card at {target_url} missing 'models' dictionary")
+
+                # Save to local disk cache with sync metadata
+                try:
+                    target_cache.parent.mkdir(parents=True, exist_ok=True)
+                    to_cache = dict(data)
+                    to_cache["_sync_metadata"] = {
+                        "fetched_at_epoch": now,
+                        "fetched_at_iso": datetime.now(timezone.utc).isoformat(),
+                        "source_url": target_url,
+                        "adk_finops_version": __version__,
+                    }
+                    with open(target_cache, "w", encoding="utf-8") as f:
+                        json.dump(to_cache, f, indent=2)
+                except Exception as cache_err:
+                    logger.debug(f"[FinOps Rate Card] Could not write cache to {target_cache}: {cache_err}")
+
+                status = {
+                    "status": "synced",
+                    "source": target_url,
+                    "cache_path": str(target_cache),
+                    "models_loaded": len(data.get("models", {})),
+                    "tools_loaded": len(data.get("tools", {})),
+                }
+                self._last_sync_status = status
+                logger.info(
+                    f"[FinOps Rate Card] Synced {status['models_loaded']} models from remote rate card ({target_url})"
+                )
+                return status
+            except Exception as net_err:
+                # 3. Graceful fallback to stale cache if available, else bundled default_rates.json
+                if target_cache.exists():
+                    try:
+                        with open(target_cache, encoding="utf-8") as f:
+                            stale_data = json.load(f)
+                        if isinstance(stale_data.get("models"), dict):
+                            self.load_from_dict(stale_data)
+                            status = {
+                                "status": "stale_cache_fallback",
+                                "source": str(target_cache),
+                                "url": target_url,
+                                "models_loaded": len(stale_data.get("models", {})),
+                                "error": str(net_err),
+                            }
+                            self._last_sync_status = status
+                            logger.warning(
+                                f"[FinOps Rate Card] Remote sync failed ({net_err}); using cached rate card at {target_cache}"
+                            )
+                            return status
+                    except Exception:
+                        pass
+
+                status = {
+                    "status": "bundled_fallback",
+                    "source": str(DEFAULT_RATES_FILE),
+                    "url": target_url,
+                    "models_loaded": len(self._models),
+                    "error": str(net_err),
+                }
+                self._last_sync_status = status
+                logger.warning(
+                    f"[FinOps Rate Card] Remote sync failed ({net_err}); falling back to bundled default_rates.json"
+                )
+                return status
+
+        if background:
+            t = threading.Thread(target=_do_sync, daemon=True, name="adk-finops-rate-sync")
+            t.start()
+            return {
+                "status": "scheduled_background",
+                "url": target_url,
+                "cache_path": str(target_cache),
+            }
+
+        return _do_sync()
+
+    @property
+    def last_sync_status(self) -> dict[str, Any]:
+        return dict(self._last_sync_status)
 
     def register_model(self, model_name: str, rate: ModelRate | dict[str, Any]) -> None:
         """Registers or overrides a single model rate card."""

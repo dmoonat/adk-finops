@@ -1,19 +1,27 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "2026.09",
-  "source_url": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+  "source_urls": [
+    "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+  ],
+  "sources": [
+    {
+      "name": "gemini_enterprise_pricing",
+      "url": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+      "scope": "Google Cloud Gemini Enterprise Agent Platform (Global, Regional & Grounding Tools)",
+      "status": "synced"
+    },
+    {
+      "name": "litellm_registry",
+      "url": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+      "scope": "Multi-Provider (OpenAI, Anthropic, DeepSeek & Cross-Validation)",
+      "status": "synced"
+    }
+  ],
   "description": "Standard LLM pricing rate cards (USD per 1,000,000 tokens unless specified).",
   "models": {
     "gemini-3.1-pro-preview": {
-      "provider": "google",
-      "input_per_1m": 2.00,
-      "output_per_1m": 12.00,
-      "cached_input_per_1m": 0.20,
-      "input_per_1m_gt_200k": 4.00,
-      "output_per_1m_gt_200k": 18.00,
-      "cached_input_per_1m_gt_200k": 0.40
-    },
-    "gemini-3.1-pro": {
       "provider": "google",
       "input_per_1m": 2.00,
       "output_per_1m": 12.00,
