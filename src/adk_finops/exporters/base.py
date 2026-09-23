@@ -66,6 +66,9 @@ class BaseExporter(ABC):
 
         breakdown_by_agent = scope_data.get("breakdown_by_agent")
         breakdown_by_model = scope_data.get("breakdown_by_model")
+        breakdown_by_tool = scope_data.get("breakdown_by_tool")
+        if not breakdown_by_tool and isinstance(scope_data.get("tools"), dict) and scope_data.get("tools"):
+            breakdown_by_tool = {agent_name or "root_agent": scope_data["tools"]}
 
         eff_root = root_agent_name or scope_data.get("root_agent_name")
         if not eff_root and isinstance(breakdown_by_agent, dict) and breakdown_by_agent:
@@ -109,6 +112,7 @@ class BaseExporter(ABC):
             "budget_exceeded": b_exceeded,
             "breakdown_by_agent": json.dumps(breakdown_by_agent) if breakdown_by_agent else None,
             "breakdown_by_model": json.dumps(breakdown_by_model) if breakdown_by_model else None,
+            "breakdown_by_tool": json.dumps(breakdown_by_tool) if breakdown_by_tool else None,
             "tags": json.dumps(merged_tags) if merged_tags else None,
         }
 

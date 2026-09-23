@@ -146,3 +146,59 @@ def test_tracker_print_and_format_methods():
 
     # Test print_summary on CostTracker (should not raise)
     CostTracker.print_summary("test_disp_turn", "test_disp_sess")
+
+
+def test_tool_cost_breakdown_in_summary_boxes():
+    CostTracker.reset()
+    CostTracker.set_enabled(True)
+    CostTracker.start_turn("turn_tools", "sess_tools")
+    CostTracker.record_usage(
+        run_id="turn_tools",
+        session_id="sess_tools",
+        model_name="gemini-2.5-flash",
+        prompt_tokens=1000,
+        completion_tokens=250,
+        agent_name="cloud_infra_researcher",
+    )
+    CostTracker.record_tool_call(
+        run_id="turn_tools",
+        session_id="sess_tools",
+        tool_name="fetch_cloud_benchmarks",
+        count=2,
+        task_name="fetch_cloud_benchmarks",
+        custom_cost_usd=0.015,
+        agent_name="cloud_infra_researcher",
+    )
+    CostTracker.record_tool_call(
+        run_id="turn_tools",
+        session_id="sess_tools",
+        tool_name="format_executive_brief",
+        count=1,
+        task_name="format_executive_brief",
+        custom_cost_usd=0.008,
+        agent_name="executive_report_writer",
+    )
+
+    summary = CostTracker.get_summary("turn_tools", "sess_tools", pop=False)
+    assert summary is not None
+    tool_bd = summary["session"]["breakdown_by_tool"]
+    assert tool_bd["cloud_infra_researcher"]["fetch_cloud_benchmarks"] == {
+        "calls": 2,
+        "total_cost_usd": 0.03,
+    }
+    assert tool_bd["executive_report_writer"]["format_executive_brief"] == {
+        "calls": 1,
+        "total_cost_usd": 0.008,
+    }
+
+    rich_box = format_summary_box(summary)
+    assert "fetch_cloud_benchmarks" in rich_box
+    assert "format_executive_brief" in rich_box
+    assert "$0.0300" in rich_box
+    assert "$0.0080" in rich_box
+
+    plain_box = format_plain_summary_box(summary)
+    assert "Tools Breakdown (Agent -> Tool -> Calls -> Cost):" in plain_box
+    assert "cloud_infra_researcher -> fetch_cloud_benchmarks: 2 call(s) ($0.0300)" in plain_box
+    assert "executive_report_writer -> format_executive_brief: 1 call(s) ($0.0080)" in plain_box
+

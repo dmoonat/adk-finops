@@ -22,6 +22,12 @@ from .display import (
     print_task_efficiency_summary,
     render_task_efficiency_table,
 )
+from .billable import (
+    BillableToolSpec,
+    billable,
+    extract_billable_spec,
+    is_error_tool_result,
+)
 from .rate_card import ModelRate, RateCardRegistry
 from .tracker import BudgetExceededError, CostTracker
 
@@ -34,6 +40,9 @@ try:
         "FinOpsCostPlugin",
         "RateCardRegistry",
         "ModelRate",
+        "BillableToolSpec",
+        "billable",
+        "extract_billable_spec",
         "print_summary",
         "format_summary_box",
         "print_task_efficiency_summary",
@@ -46,6 +55,9 @@ except ImportError:
         "BudgetExceededError",
         "RateCardRegistry",
         "ModelRate",
+        "BillableToolSpec",
+        "billable",
+        "extract_billable_spec",
         "print_summary",
         "format_summary_box",
         "print_task_efficiency_summary",

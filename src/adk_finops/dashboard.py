@@ -117,6 +117,23 @@ def _normalize_row(raw: dict[str, Any], source: str = "local") -> dict[str, Any]
         except Exception:
             breakdown_by_agent = {}
 
+    breakdown_by_tool_raw = raw.get("breakdown_by_tool")
+    breakdown_by_tool: dict[str, Any] = {}
+    if isinstance(breakdown_by_tool_raw, dict):
+        breakdown_by_tool = breakdown_by_tool_raw
+    elif isinstance(breakdown_by_tool_raw, str) and breakdown_by_tool_raw.strip():
+        try:
+            parsed_bbt = json.loads(breakdown_by_tool_raw)
+            if isinstance(parsed_bbt, dict):
+                breakdown_by_tool = parsed_bbt
+        except Exception:
+            breakdown_by_tool = {}
+
+    if not breakdown_by_tool and breakdown_by_agent:
+        for a_key, a_val in breakdown_by_agent.items():
+            if isinstance(a_val, dict) and isinstance(a_val.get("tools"), dict) and a_val["tools"]:
+                breakdown_by_tool[a_key] = a_val["tools"]
+
     return {
         "timestamp": str(raw.get("timestamp") or datetime.now(timezone.utc).isoformat()),
         "session_id": str(raw.get("session_id") or "default_session"),
@@ -141,10 +158,11 @@ def _normalize_row(raw: dict[str, Any], source: str = "local") -> dict[str, Any]
         "gross_cost_usd": _to_float(raw.get("gross_cost_usd")),
         "savings_usd": _to_float(raw.get("savings_usd")),
         "savings_pct": _to_float(raw.get("savings_pct")),
-        "tool_calls_count": _to_int(raw.get("tool_calls_count")),
+        "tool_calls_count": _to_int(raw.get("tool_calls_count") or raw.get("total_tool_calls") or raw.get("tool_calls")),
         "budget_limit_usd": _to_float(raw.get("budget_limit_usd")) if raw.get("budget_limit_usd") not in (None, "") else None,
         "budget_utilization_pct": _to_float(raw.get("budget_utilization_pct")) if raw.get("budget_utilization_pct") not in (None, "") else None,
         "budget_exceeded": str(raw.get("budget_exceeded", "")).lower() in ("true", "1") if isinstance(raw.get("budget_exceeded"), str) else bool(raw.get("budget_exceeded", False)),
+        "breakdown_by_tool": breakdown_by_tool,
         "_breakdown_by_agent_keys": list(breakdown_by_agent.keys()) if breakdown_by_agent else [],
         "source": source,
     }
@@ -192,11 +210,24 @@ def _enrich_hierarchy(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             session_root = "root_agent"
 
         has_rollup = any(r.get("agent_name") is None for r in group)
+        merged_tool_bd: dict[str, dict[str, Any]] = {}
+        for r in group:
+            r_tools = r.get("breakdown_by_tool")
+            if isinstance(r_tools, dict):
+                for a_k, t_map in r_tools.items():
+                    if isinstance(t_map, dict):
+                        target_map = merged_tool_bd.setdefault(a_k, {})
+                        for t_k, t_v in t_map.items():
+                            if isinstance(t_v, dict):
+                                target_map[t_k] = dict(t_v)
+
         for r in group:
             r["root_agent_name"] = r.get("root_agent_name") or session_root
             if r.get("agent_name") is None:
                 r["agent_role"] = "root_rollup"
                 r["parent_agent_name"] = None
+                if not r.get("breakdown_by_tool") and merged_tool_bd:
+                    r["breakdown_by_tool"] = merged_tool_bd
             elif r["agent_name"] == r["root_agent_name"]:
                 r["agent_role"] = "root_self"
                 r["parent_agent_name"] = None
@@ -237,6 +268,7 @@ def _enrich_hierarchy(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "budget_limit_usd": first.get("budget_limit_usd"),
                 "budget_utilization_pct": first.get("budget_utilization_pct"),
                 "budget_exceeded": any(r.get("budget_exceeded") for r in group),
+                "breakdown_by_tool": merged_tool_bd,
                 "source": first.get("source", "synthesized"),
             }
             enriched.append(synth)
@@ -295,7 +327,7 @@ def collect_telemetry_rows(
 
     # 2. Read live in-memory CostTracker sessions (real-time mid-run state)
     try:
-        active_sessions = getattr(CostTracker, "_sessions", {})
+        active_sessions = getattr(CostTracker, "_active_runs", None) or getattr(CostTracker, "_sessions", {})
         for sess_id in list(active_sessions.keys()):
             summary = CostTracker.get_summary(run_id=sess_id, session_id=sess_id, pop=False)
             if not summary:
@@ -388,6 +420,7 @@ def collect_telemetry_rows(
                   budget_utilization_pct,
                   budget_exceeded,
                   breakdown_by_agent,
+                  breakdown_by_tool,
                   tags
                 FROM `{resolved_bq}`
                 ORDER BY timestamp DESC
@@ -553,533 +586,627 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="hierarchyContainer" class="space-y-4"></div>
     </div>
 
-    <!-- Charts Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-      <div class="card p-4">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Spend Efficiency & ROI</h2>
-        <div class="h-56 flex items-center justify-center">
-          <canvas id="efficiencyChart"></canvas>
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="card p-4">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Spend Efficiency & ROI</h2>
+          <div class="h-56 flex items-center justify-center">
+            <canvas id="efficiencyChart"></canvas>
+          </div>
+        </div>
+        <div class="card p-4">
+          <h2 id="agentChartTitle" class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Sub-Agent Cost Attribution ($)</h2>
+          <div class="h-56">
+            <canvas id="agentChart"></canvas>
+          </div>
+        </div>
+        <div class="card p-4">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Token Composition by Model</h2>
+          <div class="h-56">
+            <canvas id="modelChart"></canvas>
+          </div>
         </div>
       </div>
-      <div class="card p-4">
-        <h2 id="agentChartTitle" class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Sub-Agent Cost Attribution ($)</h2>
-        <div class="h-56">
-          <canvas id="agentChart"></canvas>
+
+      <!-- Tool Cost Attribution Table (Agent -> Tool -> Calls -> Cost) -->
+      <div class="card overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+              <span>🔧 Tool Cost Attribution (Agent ➔ Tool ➔ Calls ➔ Cost)</span>
+            </h2>
+            <p class="text-xs text-gray-400">Aggregated billable tool & grounding fees across the filtered sessions and agents.</p>
+          </div>
+          <span id="toolCountBadge" class="text-xs text-emerald-400 font-mono">0 tool calls ($0.0000)</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-900/90 text-gray-400 border-b border-gray-800">
+                <th class="py-2 px-4">🤖 Agent Name</th>
+                <th class="py-2 px-4">🔧 Tool Name</th>
+                <th class="py-2 px-4 text-right"># Calls</th>
+                <th class="py-2 px-4 text-right">Avg Cost / Call</th>
+                <th class="py-2 px-4 text-right">Total Tool Cost (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="toolBreakdownBody" class="divide-y divide-gray-800/70 font-mono"></tbody>
+          </table>
         </div>
       </div>
-      <div class="card p-4">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Token Composition by Model</h2>
-        <div class="h-56">
-          <canvas id="modelChart"></canvas>
+
+      <!-- Live Telemetry Table -->
+      <div class="card overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">Near-Live Session & Hierarchical Agent Telemetry</h2>
+          <span id="rowCountBadge" class="text-xs text-gray-400 font-mono">0 records</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-900/90 text-gray-400 border-b border-gray-800">
+                <th class="py-2.5 px-3">Time (UTC)</th>
+                <th class="py-2.5 px-3">Session ID</th>
+                <th class="py-2.5 px-3">👑 Root (Parent) Agent</th>
+                <th class="py-2.5 px-3">↳ Agent / Hierarchy Role</th>
+                <th class="py-2.5 px-3">Model</th>
+                <th class="py-2.5 px-3">Outcome</th>
+                <th class="py-2.5 px-3 text-right">Tokens (In/Out/Think)</th>
+                <th class="py-2.5 px-3 text-right">Cached</th>
+                <th class="py-2.5 px-3 text-right">Tools (Calls / Fee)</th>
+                <th class="py-2.5 px-3 text-right">Total Cost</th>
+                <th class="py-2.5 px-3 text-right">Saved</th>
+                <th class="py-2.5 px-3">Source / Error</th>
+              </tr>
+            </thead>
+            <tbody id="telemetryBody" class="divide-y divide-gray-800/70 font-mono"></tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <!-- Live Telemetry Table -->
-    <div class="card overflow-hidden">
-      <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-white">Near-Live Session & Hierarchical Agent Telemetry</h2>
-        <span id="rowCountBadge" class="text-xs text-gray-400 font-mono">0 records</span>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr class="bg-gray-900/90 text-gray-400 border-b border-gray-800">
-              <th class="py-2.5 px-3">Time (UTC)</th>
-              <th class="py-2.5 px-3">Session ID</th>
-              <th class="py-2.5 px-3">👑 Root (Parent) Agent</th>
-              <th class="py-2.5 px-3">↳ Agent / Hierarchy Role</th>
-              <th class="py-2.5 px-3">Model</th>
-              <th class="py-2.5 px-3">Outcome</th>
-              <th class="py-2.5 px-3 text-right">Tokens (In/Out/Think)</th>
-              <th class="py-2.5 px-3 text-right">Cached</th>
-              <th class="py-2.5 px-3 text-right">Total Cost</th>
-              <th class="py-2.5 px-3 text-right">Saved</th>
-              <th class="py-2.5 px-3">Source / Error</th>
-            </tr>
-          </thead>
-          <tbody id="telemetryBody" class="divide-y divide-gray-800/70 font-mono"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+    <script>
+      let rawRows = [];
+      let isPaused = false;
+      let effChart = null, agentChart = null, modelChart = null;
 
-  <script>
-    let rawRows = [];
-    let isPaused = false;
-    let effChart = null, agentChart = null, modelChart = null;
+      function togglePause() {
+        isPaused = !isPaused;
+        document.getElementById('pauseBtn').innerText = isPaused ? '▶ Resume Auto-Refresh' : '⏸ Pause Auto-Refresh';
+        document.getElementById('liveStatusText').innerText = isPaused ? 'PAUSED' : 'LIVE (2s)';
+        document.getElementById('liveDot').className = isPaused
+          ? 'w-2 h-2 rounded-full bg-amber-400'
+          : 'w-2 h-2 rounded-full bg-emerald-400 pulse-dot';
+      }
 
-    function togglePause() {
-      isPaused = !isPaused;
-      document.getElementById('pauseBtn').innerText = isPaused ? '▶ Resume Auto-Refresh' : '⏸ Pause Auto-Refresh';
-      document.getElementById('liveStatusText').innerText = isPaused ? 'PAUSED' : 'LIVE (2s)';
-      document.getElementById('liveDot').className = isPaused
-        ? 'w-2 h-2 rounded-full bg-amber-400'
-        : 'w-2 h-2 rounded-full bg-emerald-400 pulse-dot';
-    }
+      async function fetchMetrics() {
+        const includeBq = document.getElementById('bqToggle').checked;
+        try {
+          const res = await fetch(`/api/metrics?include_bigquery=${includeBq}`);
+          const data = await res.json();
+          rawRows = data.rows || [];
+          document.getElementById('activeSources').innerText = (data.sources || []).join(', ') || 'waiting for runs...';
+          document.getElementById('lastUpdated').innerText = data.updated_at || '--:--:--';
+          updateFilterDropdowns();
+          renderDashboard();
+        } catch (e) {
+          console.error('Dashboard fetch error:', e);
+        }
+      }
 
-    async function fetchMetrics() {
-      const includeBq = document.getElementById('bqToggle').checked;
-      try {
-        const res = await fetch(`/api/metrics?include_bigquery=${includeBq}`);
-        const data = await res.json();
-        rawRows = data.rows || [];
-        document.getElementById('activeSources').innerText = (data.sources || []).join(', ') || 'waiting for runs...';
-        document.getElementById('lastUpdated').innerText = data.updated_at || '--:--:--';
-        updateFilterDropdowns();
+      function updateFilterDropdowns() {
+        const rootAgents = new Set();
+        rawRows.forEach(r => {
+          if (r.root_agent_name) rootAgents.add(r.root_agent_name);
+        });
+        syncSelect('rootAgentFilter', 'All Root Agents (Overall Rollup)', [...rootAgents].map(ra => ({ value: ra, label: `👑 ${ra} (Parent Rollup)` })));
+        populateDependentDropdowns();
+      }
+
+      function populateDependentDropdowns() {
+        const rootVal = document.getElementById('rootAgentFilter').value;
+        const subAgents = new Map();
+
+        // 1. Populate Sub-Agents belonging to the selected Root Agent
+        rawRows.forEach(r => {
+          const rRoot = r.root_agent_name || 'root_agent';
+          if (rootVal !== 'ALL' && rRoot !== rootVal) return;
+          if (r.agent_name) {
+            const isRootSelf = r.agent_name === rRoot;
+            const label = isRootSelf
+              ? `👑 ${r.agent_name} (Root Orchestrator Direct Only)`
+              : (rootVal === 'ALL' ? `↳ 🤖 ${r.agent_name} [under ${rRoot}]` : `↳ 🤖 ${r.agent_name} (Sub-Agent)`);
+            subAgents.set(r.agent_name, label);
+          }
+        });
+        const subItems = [...subAgents.entries()].map(([val, label]) => ({ value: val, label }));
+        const allSubLabel = rootVal === 'ALL'
+          ? '∑ Overall Parent Total (All Root + Sub-Agents)'
+          : `∑ ${rootVal} Overall Total (Parent + Sub-Agents)`;
+        syncSelect('subAgentFilter', allSubLabel, subItems);
+
+        // 2. Populate Sessions & Models scoped strictly to the selected Root Agent (and Sub-Agent if selected)
+        const subVal = document.getElementById('subAgentFilter').value;
+        const sessions = new Map();
+        const models = new Set();
+
+        rawRows.forEach(r => {
+          const rRoot = r.root_agent_name || 'root_agent';
+          if (rootVal !== 'ALL' && rRoot !== rootVal) return;
+          if (subVal !== 'ALL' && r.agent_name !== subVal) return;
+          if (r.session_id && !sessions.has(r.session_id)) {
+            const sessLabel = rootVal === 'ALL'
+              ? `${r.session_id} (${rRoot})`
+              : r.session_id;
+            sessions.set(r.session_id, sessLabel);
+          }
+          if (r.model_name) {
+            models.add(r.model_name);
+          }
+        });
+
+        const sessItems = [...sessions.entries()].map(([val, label]) => ({ value: val, label }));
+        const allSessLabel = rootVal === 'ALL'
+          ? `All Sessions (${sessItems.length})`
+          : `All Sessions for ${rootVal} (${sessItems.length})`;
+        syncSelect('sessionFilter', allSessLabel, sessItems);
+
+        const modelItems = [...models].map(m => ({ value: m, label: m }));
+        syncSelect('modelFilter', 'All Models', modelItems);
+      }
+
+      function onRootAgentChange() {
+        document.getElementById('subAgentFilter').value = 'ALL';
+        document.getElementById('sessionFilter').value = 'ALL';
+        populateDependentDropdowns();
         renderDashboard();
-      } catch (e) {
-        console.error('Dashboard fetch error:', e);
-      }
-    }
-
-    function updateFilterDropdowns() {
-      const rootAgents = new Set();
-      rawRows.forEach(r => {
-        if (r.root_agent_name) rootAgents.add(r.root_agent_name);
-      });
-      syncSelect('rootAgentFilter', 'All Root Agents (Overall Rollup)', [...rootAgents].map(ra => ({ value: ra, label: `👑 ${ra} (Parent Rollup)` })));
-      populateDependentDropdowns();
-    }
-
-    function populateDependentDropdowns() {
-      const rootVal = document.getElementById('rootAgentFilter').value;
-      const subAgents = new Map();
-
-      // 1. Populate Sub-Agents belonging to the selected Root Agent
-      rawRows.forEach(r => {
-        const rRoot = r.root_agent_name || 'root_agent';
-        if (rootVal !== 'ALL' && rRoot !== rootVal) return;
-        if (r.agent_name) {
-          const isRootSelf = r.agent_name === rRoot;
-          const label = isRootSelf
-            ? `👑 ${r.agent_name} (Root Orchestrator Direct Only)`
-            : (rootVal === 'ALL' ? `↳ 🤖 ${r.agent_name} [under ${rRoot}]` : `↳ 🤖 ${r.agent_name} (Sub-Agent)`);
-          subAgents.set(r.agent_name, label);
-        }
-      });
-      const subItems = [...subAgents.entries()].map(([val, label]) => ({ value: val, label }));
-      const allSubLabel = rootVal === 'ALL'
-        ? '∑ Overall Parent Total (All Root + Sub-Agents)'
-        : `∑ ${rootVal} Overall Total (Parent + Sub-Agents)`;
-      syncSelect('subAgentFilter', allSubLabel, subItems);
-
-      // 2. Populate Sessions & Models scoped strictly to the selected Root Agent (and Sub-Agent if selected)
-      const subVal = document.getElementById('subAgentFilter').value;
-      const sessions = new Map();
-      const models = new Set();
-
-      rawRows.forEach(r => {
-        const rRoot = r.root_agent_name || 'root_agent';
-        if (rootVal !== 'ALL' && rRoot !== rootVal) return;
-        if (subVal !== 'ALL' && r.agent_name !== subVal) return;
-        if (r.session_id && !sessions.has(r.session_id)) {
-          const sessLabel = rootVal === 'ALL'
-            ? `${r.session_id} (${rRoot})`
-            : r.session_id;
-          sessions.set(r.session_id, sessLabel);
-        }
-        if (r.model_name) {
-          models.add(r.model_name);
-        }
-      });
-
-      const sessItems = [...sessions.entries()].map(([val, label]) => ({ value: val, label }));
-      const allSessLabel = rootVal === 'ALL'
-        ? `All Sessions (${sessItems.length})`
-        : `All Sessions for ${rootVal} (${sessItems.length})`;
-      syncSelect('sessionFilter', allSessLabel, sessItems);
-
-      const modelItems = [...models].map(m => ({ value: m, label: m }));
-      syncSelect('modelFilter', 'All Models', modelItems);
-    }
-
-    function onRootAgentChange() {
-      document.getElementById('subAgentFilter').value = 'ALL';
-      document.getElementById('sessionFilter').value = 'ALL';
-      populateDependentDropdowns();
-      renderDashboard();
-    }
-
-    function onSubAgentChange() {
-      populateDependentDropdowns();
-      renderDashboard();
-    }
-
-    function selectHierarchyTarget(rootName, subName) {
-      document.getElementById('rootAgentFilter').value = rootName || 'ALL';
-      populateDependentDropdowns();
-      document.getElementById('subAgentFilter').value = subName || 'ALL';
-      populateDependentDropdowns();
-      renderDashboard();
-    }
-
-    function resetHierarchyFilter() {
-      document.getElementById('rootAgentFilter').value = 'ALL';
-      document.getElementById('subAgentFilter').value = 'ALL';
-      document.getElementById('sessionFilter').value = 'ALL';
-      populateDependentDropdowns();
-      renderDashboard();
-    }
-
-    function syncSelect(id, allLabel, items) {
-      const sel = document.getElementById(id);
-      const cur = sel.value;
-      sel.innerHTML = `<option value="ALL">${allLabel}</option>` +
-        items.map(x => `<option value="${x.value}">${x.label}</option>`).join('');
-      if (items.some(x => x.value === cur)) {
-        sel.value = cur;
-      } else {
-        sel.value = 'ALL';
-      }
-    }
-
-    function renderDashboard() {
-      const sessVal = document.getElementById('sessionFilter').value;
-      const rootVal = document.getElementById('rootAgentFilter').value;
-      const subVal = document.getElementById('subAgentFilter').value;
-      const modelVal = document.getElementById('modelFilter').value;
-      const outcomeVal = document.getElementById('outcomeFilter').value;
-
-      const sessionScopeRows = rawRows.filter(r => r.scope === 'session');
-      const baseRows = sessionScopeRows.length > 0 ? sessionScopeRows : rawRows;
-
-      // Filter rows by Session, Root Agent, and Outcome first (used for Hierarchy Tree & Charts)
-      const parentMatchedRows = baseRows.filter(r => {
-        if (sessVal !== 'ALL' && r.session_id !== sessVal) return false;
-        if (rootVal !== 'ALL' && (r.root_agent_name || 'root_agent') !== rootVal) return false;
-        if (outcomeVal === 'EFFECTIVE' && r.is_failure) return false;
-        if (outcomeVal === 'WASTED' && !r.is_failure) return false;
-        return true;
-      });
-
-      // Rows matching Sub-Agent and Model filters as well
-      const filtered = parentMatchedRows.filter(r => {
-        if (subVal !== 'ALL' && r.agent_name !== subVal) return false;
-        if (modelVal !== 'ALL' && r.model_name !== modelVal) return false;
-        return true;
-      });
-
-      // Determine KPI rows:
-      // - When subVal === 'ALL' and modelVal === 'ALL', use root_rollup rows (agent_name === null) so KPIs show true Overall Parent-Level Spend!
-      // - Otherwise sum the matching child/model rows.
-      let kpiRows = [];
-      if (subVal === 'ALL' && modelVal === 'ALL') {
-        kpiRows = parentMatchedRows.filter(r => !r.agent_name);
-        if (kpiRows.length === 0) kpiRows = parentMatchedRows.filter(r => r.agent_name);
-        document.getElementById('kpiScopeBadge').innerText = rootVal === 'ALL'
-          ? '∑ All Root Rollups'
-          : `∑ ${rootVal} (Parent Total)`;
-      } else {
-        kpiRows = filtered.filter(r => r.agent_name);
-        if (kpiRows.length === 0) kpiRows = filtered;
-        document.getElementById('kpiScopeBadge').innerText = subVal !== 'ALL'
-          ? `↳ ${subVal}`
-          : `Model: ${modelVal}`;
       }
 
-      let totalCost = 0, llmCost = 0, toolCost = 0, effCost = 0, wastedCost = 0, savedCost = 0;
-      let totalTok = 0, inTok = 0, outTok = 0, thinkTok = 0, cachedTok = 0;
-      let succCount = 0, failCount = 0;
+      function onSubAgentChange() {
+        populateDependentDropdowns();
+        renderDashboard();
+      }
 
-      kpiRows.forEach(r => {
-        totalCost += r.total_cost_usd || 0;
-        llmCost += r.llm_cost_usd || 0;
-        toolCost += r.tool_cost_usd || 0;
-        savedCost += r.savings_usd || 0;
-        totalTok += r.total_tokens || 0;
-        inTok += r.prompt_tokens || 0;
-        outTok += r.completion_tokens || 0;
-        thinkTok += r.thoughts_tokens || 0;
-        cachedTok += r.cached_tokens || 0;
-        if (r.is_failure) {
-          wastedCost += r.total_cost_usd || 0;
-          failCount++;
+      function selectHierarchyTarget(rootName, subName) {
+        document.getElementById('rootAgentFilter').value = rootName || 'ALL';
+        populateDependentDropdowns();
+        document.getElementById('subAgentFilter').value = subName || 'ALL';
+        populateDependentDropdowns();
+        renderDashboard();
+      }
+
+      function resetHierarchyFilter() {
+        document.getElementById('rootAgentFilter').value = 'ALL';
+        document.getElementById('subAgentFilter').value = 'ALL';
+        document.getElementById('sessionFilter').value = 'ALL';
+        populateDependentDropdowns();
+        renderDashboard();
+      }
+
+      function syncSelect(id, allLabel, items) {
+        const sel = document.getElementById(id);
+        const cur = sel.value;
+        sel.innerHTML = `<option value="ALL">${allLabel}</option>` +
+          items.map(x => `<option value="${x.value}">${x.label}</option>`).join('');
+        if (items.some(x => x.value === cur)) {
+          sel.value = cur;
         } else {
-          effCost += r.total_cost_usd || 0;
-          succCount++;
+          sel.value = 'ALL';
         }
-      });
+      }
 
-      const wastedPct = totalCost > 0 ? ((wastedCost / totalCost) * 100).toFixed(1) : '0.0';
-      document.getElementById('kpiTotalCost').innerText = `$${totalCost.toFixed(4)}`;
-      document.getElementById('kpiCostSub').innerText = `LLM: $${llmCost.toFixed(4)} • Grounding: $${toolCost.toFixed(4)}`;
-      document.getElementById('kpiEffectiveCost').innerText = `$${effCost.toFixed(4)}`;
-      document.getElementById('kpiEffectiveSub').innerText = `${succCount} successful record(s)`;
-      document.getElementById('kpiWastedCost').innerText = `$${wastedCost.toFixed(4)}`;
-      document.getElementById('kpiWastedSub').innerText = `${wastedPct}% of total spend (${failCount} failed)`;
-      document.getElementById('kpiSavingsCost').innerText = `$${savedCost.toFixed(4)}`;
-      document.getElementById('kpiSavingsSub').innerText = `${cachedTok.toLocaleString()} cached tokens`;
-      document.getElementById('kpiTotalTokens').innerText = totalTok.toLocaleString();
-      document.getElementById('kpiTokenSub').innerText = `In: ${inTok.toLocaleString()} • Out: ${outTok.toLocaleString()} • Think: ${thinkTok.toLocaleString()}`;
+      function renderDashboard() {
+        const sessVal = document.getElementById('sessionFilter').value;
+        const rootVal = document.getElementById('rootAgentFilter').value;
+        const subVal = document.getElementById('subAgentFilter').value;
+        const modelVal = document.getElementById('modelFilter').value;
+        const outcomeVal = document.getElementById('outcomeFilter').value;
 
-      renderHierarchyTree(parentMatchedRows, rootVal, subVal);
+        const sessionScopeRows = rawRows.filter(r => r.scope === 'session');
+        const baseRows = sessionScopeRows.length > 0 ? sessionScopeRows : rawRows;
 
-      // Sub-Agent Breakdown for Chart (when a Root Agent is selected, show its children even if subVal === 'ALL')
-      const chartSourceRows = (subVal === 'ALL' ? parentMatchedRows : filtered).filter(r => r.agent_name && (modelVal === 'ALL' || r.model_name === modelVal));
-      const agentMap = {};
-      chartSourceRows.forEach(r => {
-        const isRootSelf = r.agent_name === r.root_agent_name;
-        const label = isRootSelf ? `👑 ${r.agent_name} (Direct)` : `↳ 🤖 ${r.agent_name}`;
-        if (!agentMap[label]) agentMap[label] = { llm: 0, tool: 0, tokens: 0, model: r.model_name };
-        agentMap[label].llm += r.llm_cost_usd || 0;
-        agentMap[label].tool += r.tool_cost_usd || 0;
-        agentMap[label].tokens += r.total_tokens || 0;
-      });
-      document.getElementById('agentChartTitle').innerText = rootVal === 'ALL'
-        ? 'Root & Sub-Agent Cost Attribution ($)'
-        : `Sub-Agents of 👑 ${rootVal} ($ Spend)`;
+        // Filter rows by Session, Root Agent, and Outcome first (used for Hierarchy Tree & Charts)
+        const parentMatchedRows = baseRows.filter(r => {
+          if (sessVal !== 'ALL' && r.session_id !== sessVal) return false;
+          if (rootVal !== 'ALL' && (r.root_agent_name || 'root_agent') !== rootVal) return false;
+          if (outcomeVal === 'EFFECTIVE' && r.is_failure) return false;
+          if (outcomeVal === 'WASTED' && !r.is_failure) return false;
+          return true;
+        });
 
-      // Model Breakdown
-      const modelMap = {};
-      (chartSourceRows.length ? chartSourceRows : kpiRows).forEach(r => {
-        const m = r.model_name || 'gemini-2.5-flash';
-        if (!modelMap[m]) modelMap[m] = { prompt: 0, completion: 0, thoughts: 0, cached: 0 };
-        modelMap[m].prompt += r.prompt_tokens || 0;
-        modelMap[m].completion += r.completion_tokens || 0;
-        modelMap[m].thoughts += r.thoughts_tokens || 0;
-        modelMap[m].cached += r.cached_tokens || 0;
-      });
+        // Rows matching Sub-Agent and Model filters as well
+        const filtered = parentMatchedRows.filter(r => {
+          if (subVal !== 'ALL' && r.agent_name !== subVal) return false;
+          if (modelVal !== 'ALL' && r.model_name !== modelVal) return false;
+          return true;
+        });
 
-      updateCharts(effCost, wastedCost, savedCost, agentMap, modelMap);
-      renderTable(subVal === 'ALL' ? parentMatchedRows.filter(r => modelVal === 'ALL' || !r.agent_name || r.model_name === modelVal) : filtered);
-    }
-
-    function renderHierarchyTree(rows, activeRoot, activeSub) {
-      const container = document.getElementById('hierarchyContainer');
-      const roots = {};
-
-      rows.forEach(r => {
-        const rootName = r.root_agent_name || 'root_agent';
-        if (!roots[rootName]) {
-          roots[rootName] = {
-            rollupCost: 0,
-            rollupTokens: 0,
-            rollupSavings: 0,
-            sessions: new Set(),
-            children: {}
-          };
-        }
-        roots[rootName].sessions.add(r.session_id);
-        if (!r.agent_name) {
-          roots[rootName].rollupCost += r.total_cost_usd || 0;
-          roots[rootName].rollupTokens += r.total_tokens || 0;
-          roots[rootName].rollupSavings += r.savings_usd || 0;
+        // Determine KPI rows:
+        // - When subVal === 'ALL' and modelVal === 'ALL', use root_rollup rows (agent_name === null) so KPIs show true Overall Parent-Level Spend!
+        // - Otherwise sum the matching child/model rows.
+        let kpiRows = [];
+        if (subVal === 'ALL' && modelVal === 'ALL') {
+          kpiRows = parentMatchedRows.filter(r => !r.agent_name);
+          if (kpiRows.length === 0) kpiRows = parentMatchedRows.filter(r => r.agent_name);
+          document.getElementById('kpiScopeBadge').innerText = rootVal === 'ALL'
+            ? '∑ All Root Rollups'
+            : `∑ ${rootVal} (Parent Total)`;
         } else {
-          const cName = r.agent_name;
-          if (!roots[rootName].children[cName]) {
-            roots[rootName].children[cName] = {
-              name: cName,
-              isRootSelf: cName === rootName,
-              cost: 0,
-              llmCost: 0,
-              toolCost: 0,
-              tokens: 0,
-              prompt: 0,
-              completion: 0,
-              thoughts: 0,
-              models: new Set()
+          kpiRows = filtered.filter(r => r.agent_name);
+          if (kpiRows.length === 0) kpiRows = filtered;
+          document.getElementById('kpiScopeBadge').innerText = subVal !== 'ALL'
+            ? `↳ ${subVal}`
+            : `Model: ${modelVal}`;
+        }
+
+        let totalCost = 0, llmCost = 0, toolCost = 0, effCost = 0, wastedCost = 0, savedCost = 0;
+        let totalTok = 0, inTok = 0, outTok = 0, thinkTok = 0, cachedTok = 0;
+        let succCount = 0, failCount = 0;
+
+        kpiRows.forEach(r => {
+          totalCost += r.total_cost_usd || 0;
+          llmCost += r.llm_cost_usd || 0;
+          toolCost += r.tool_cost_usd || 0;
+          savedCost += r.savings_usd || 0;
+          totalTok += r.total_tokens || 0;
+          inTok += r.prompt_tokens || 0;
+          outTok += r.completion_tokens || 0;
+          thinkTok += r.thoughts_tokens || 0;
+          cachedTok += r.cached_tokens || 0;
+          if (r.is_failure) {
+            wastedCost += r.total_cost_usd || 0;
+            failCount++;
+          } else {
+            effCost += r.total_cost_usd || 0;
+            succCount++;
+          }
+        });
+
+        const wastedPct = totalCost > 0 ? ((wastedCost / totalCost) * 100).toFixed(1) : '0.0';
+        document.getElementById('kpiTotalCost').innerText = `$${totalCost.toFixed(4)}`;
+        document.getElementById('kpiCostSub').innerText = `LLM: $${llmCost.toFixed(4)} • Tools: $${toolCost.toFixed(4)}`;
+        document.getElementById('kpiEffectiveCost').innerText = `$${effCost.toFixed(4)}`;
+        document.getElementById('kpiEffectiveSub').innerText = `${succCount} successful record(s)`;
+        document.getElementById('kpiWastedCost').innerText = `$${wastedCost.toFixed(4)}`;
+        document.getElementById('kpiWastedSub').innerText = `${wastedPct}% of total spend (${failCount} failed)`;
+        document.getElementById('kpiSavingsCost').innerText = `$${savedCost.toFixed(4)}`;
+        document.getElementById('kpiSavingsSub').innerText = `${cachedTok.toLocaleString()} cached tokens`;
+        document.getElementById('kpiTotalTokens').innerText = totalTok.toLocaleString();
+        document.getElementById('kpiTokenSub').innerText = `In: ${inTok.toLocaleString()} • Out: ${outTok.toLocaleString()} • Think: ${thinkTok.toLocaleString()}`;
+
+        renderHierarchyTree(parentMatchedRows, rootVal, subVal);
+
+        // Sub-Agent Breakdown for Chart (when a Root Agent is selected, show its children even if subVal === 'ALL')
+        const chartSourceRows = (subVal === 'ALL' ? parentMatchedRows : filtered).filter(r => r.agent_name && (modelVal === 'ALL' || r.model_name === modelVal));
+        const agentMap = {};
+        chartSourceRows.forEach(r => {
+          const isRootSelf = r.agent_name === r.root_agent_name;
+          const label = isRootSelf ? `👑 ${r.agent_name} (Direct)` : `↳ 🤖 ${r.agent_name}`;
+          if (!agentMap[label]) agentMap[label] = { llm: 0, tool: 0, tokens: 0, model: r.model_name };
+          agentMap[label].llm += r.llm_cost_usd || 0;
+          agentMap[label].tool += r.tool_cost_usd || 0;
+          agentMap[label].tokens += r.total_tokens || 0;
+        });
+        document.getElementById('agentChartTitle').innerText = rootVal === 'ALL'
+          ? 'Root & Sub-Agent Cost Attribution ($)'
+          : `Sub-Agents of 👑 ${rootVal} ($ Spend)`;
+
+        // Model Breakdown
+        const modelMap = {};
+        (chartSourceRows.length ? chartSourceRows : kpiRows).forEach(r => {
+          const m = r.model_name || 'gemini-2.5-flash';
+          if (!modelMap[m]) modelMap[m] = { prompt: 0, completion: 0, thoughts: 0, cached: 0 };
+          modelMap[m].prompt += r.prompt_tokens || 0;
+          modelMap[m].completion += r.completion_tokens || 0;
+          modelMap[m].thoughts += r.thoughts_tokens || 0;
+          modelMap[m].cached += r.cached_tokens || 0;
+        });
+
+        updateCharts(effCost, wastedCost, savedCost, agentMap, modelMap);
+        renderToolBreakdownTable(chartSourceRows.length ? chartSourceRows : kpiRows);
+        renderTable(subVal === 'ALL' ? parentMatchedRows.filter(r => modelVal === 'ALL' || !r.agent_name || r.model_name === modelVal) : filtered);
+      }
+
+      function renderHierarchyTree(rows, activeRoot, activeSub) {
+        const container = document.getElementById('hierarchyContainer');
+        const roots = {};
+
+        rows.forEach(r => {
+          const rootName = r.root_agent_name || 'root_agent';
+          if (!roots[rootName]) {
+            roots[rootName] = {
+              rollupCost: 0,
+              rollupTokens: 0,
+              rollupSavings: 0,
+              sessions: new Set(),
+              children: {}
             };
           }
-          const c = roots[rootName].children[cName];
-          c.cost += r.total_cost_usd || 0;
-          c.llmCost += r.llm_cost_usd || 0;
-          c.toolCost += r.tool_cost_usd || 0;
-          c.tokens += r.total_tokens || 0;
-          c.prompt += r.prompt_tokens || 0;
-          c.completion += r.completion_tokens || 0;
-          c.thoughts += r.thoughts_tokens || 0;
-          if (r.model_name) c.models.add(r.model_name);
+          roots[rootName].sessions.add(r.session_id);
+          if (!r.agent_name) {
+            roots[rootName].rollupCost += r.total_cost_usd || 0;
+            roots[rootName].rollupTokens += r.total_tokens || 0;
+            roots[rootName].rollupSavings += r.savings_usd || 0;
+          } else {
+            const cName = r.agent_name;
+            if (!roots[rootName].children[cName]) {
+              roots[rootName].children[cName] = {
+                name: cName,
+                isRootSelf: cName === rootName,
+                cost: 0,
+                llmCost: 0,
+                toolCost: 0,
+                tokens: 0,
+                prompt: 0,
+                completion: 0,
+                thoughts: 0,
+                models: new Set(),
+                tools: {}
+              };
+            }
+            const c = roots[rootName].children[cName];
+            c.cost += r.total_cost_usd || 0;
+            c.llmCost += r.llm_cost_usd || 0;
+            c.toolCost += r.tool_cost_usd || 0;
+            c.tokens += r.total_tokens || 0;
+            c.prompt += r.prompt_tokens || 0;
+            c.completion += r.completion_tokens || 0;
+            c.thoughts += r.thoughts_tokens || 0;
+            if (r.model_name) c.models.add(r.model_name);
+            const bbt = r.breakdown_by_tool || {};
+            const agentTools = bbt[cName] || {};
+            Object.entries(agentTools).forEach(([tName, tStats]) => {
+              if (!c.tools[tName]) c.tools[tName] = { calls: 0, cost: 0 };
+              c.tools[tName].calls += (tStats && tStats.calls) || 0;
+              c.tools[tName].cost += (tStats && tStats.total_cost_usd) || 0;
+            });
+          }
+        });
+
+        const rootNames = Object.keys(roots);
+        if (rootNames.length === 0) {
+          container.innerHTML = `<div class="text-xs text-gray-500 py-3">No hierarchical agent telemetry recorded yet.</div>`;
+          return;
         }
-      });
 
-      const rootNames = Object.keys(roots);
-      if (rootNames.length === 0) {
-        container.innerHTML = `<div class="text-xs text-gray-500 py-3">No hierarchical agent telemetry recorded yet.</div>`;
-        return;
-      }
+        container.innerHTML = rootNames.map(rName => {
+          const info = roots[rName];
+          const childList = Object.values(info.children).sort((a, b) => (a.isRootSelf === b.isRootSelf) ? (b.cost - a.cost) : (a.isRootSelf ? -1 : 1));
+          const sumChildrenCost = childList.reduce((acc, c) => acc + c.cost, 0);
+          const parentTotalCost = info.rollupCost > 0 ? info.rollupCost : sumChildrenCost;
+          const sumChildrenTokens = childList.reduce((acc, c) => acc + c.tokens, 0);
+          const parentTotalTokens = info.rollupTokens > 0 ? info.rollupTokens : sumChildrenTokens;
+          const subCount = childList.filter(c => !c.isRootSelf).length;
+          const isSelectedRoot = activeRoot === rName && activeSub === 'ALL';
 
-      container.innerHTML = rootNames.map(rName => {
-        const info = roots[rName];
-        const childList = Object.values(info.children).sort((a, b) => (a.isRootSelf === b.isRootSelf) ? (b.cost - a.cost) : (a.isRootSelf ? -1 : 1));
-        const sumChildrenCost = childList.reduce((acc, c) => acc + c.cost, 0);
-        const parentTotalCost = info.rollupCost > 0 ? info.rollupCost : sumChildrenCost;
-        const sumChildrenTokens = childList.reduce((acc, c) => acc + c.tokens, 0);
-        const parentTotalTokens = info.rollupTokens > 0 ? info.rollupTokens : sumChildrenTokens;
-        const subCount = childList.filter(c => !c.isRootSelf).length;
-        const isSelectedRoot = activeRoot === rName && activeSub === 'ALL';
-
-        const childrenHtml = childList.map(c => {
-          const sharePct = parentTotalCost > 0 ? ((c.cost / parentTotalCost) * 100).toFixed(1) : '0.0';
-          const isSelectedSub = activeSub === c.name;
-          const roleBadge = c.isRootSelf
-            ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 font-semibold">👑 ROOT DIRECT</span>`
-            : `<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">↳ 🤖 SUB-AGENT</span>`;
-          const borderCls = isSelectedSub
-            ? 'border-cyan-400 bg-cyan-950/30 ring-1 ring-cyan-400'
-            : 'border-gray-800 bg-gray-900/70 hover:border-gray-600';
-          const barColor = c.isRootSelf ? 'bg-indigo-500' : 'bg-cyan-500';
-          return `
-            <div onclick="selectHierarchyTarget('${rName}', '${c.name}')" class="cursor-pointer rounded-lg border p-3 transition ${borderCls}">
-              <div class="flex items-center justify-between gap-2 mb-1">
-                <div class="flex items-center gap-1.5 truncate">
-                  ${roleBadge}
-                  <span class="text-xs font-semibold text-white truncate">${c.name}</span>
+          const childrenHtml = childList.map(c => {
+            const sharePct = parentTotalCost > 0 ? ((c.cost / parentTotalCost) * 100).toFixed(1) : '0.0';
+            const isSelectedSub = activeSub === c.name;
+            const roleBadge = c.isRootSelf
+              ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 font-semibold">👑 ROOT DIRECT</span>`
+              : `<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">↳ 🤖 SUB-AGENT</span>`;
+            const borderCls = isSelectedSub
+              ? 'border-cyan-400 bg-cyan-950/30 ring-1 ring-cyan-400'
+              : 'border-gray-800 bg-gray-900/70 hover:border-gray-600';
+            const barColor = c.isRootSelf ? 'bg-indigo-500' : 'bg-cyan-500';
+            const toolPills = Object.entries(c.tools || {}).map(([tName, tStats]) =>
+              `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/70 text-[10px] font-mono">🔧 ${tName} ×${tStats.calls} ($${tStats.cost.toFixed(4)})</span>`
+            ).join(' ');
+            return `
+              <div onclick="selectHierarchyTarget('${rName}', '${c.name}')" class="cursor-pointer rounded-lg border p-3 transition ${borderCls}">
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <div class="flex items-center gap-1.5 truncate">
+                    ${roleBadge}
+                    <span class="text-xs font-semibold text-white truncate">${c.name}</span>
+                  </div>
+                  <span class="text-xs font-bold text-white font-mono">$${c.cost.toFixed(5)}</span>
                 </div>
-                <span class="text-xs font-bold text-white font-mono">$${c.cost.toFixed(5)}</span>
+                <div class="flex items-center justify-between text-[11px] text-gray-400 mb-1">
+                  <span class="truncate">Model: <span class="text-gray-300 font-mono">${[...c.models].join(', ') || 'default'}</span></span>
+                  <span class="text-cyan-300 font-mono">${sharePct}% of parent</span>
+                </div>
+                <div class="text-[10px] text-gray-400 font-mono flex justify-between mb-1.5">
+                  <span>LLM: $${c.llmCost.toFixed(4)}</span>
+                  <span class="${c.toolCost > 0 ? 'text-emerald-300 font-semibold' : ''}">Tools: $${c.toolCost.toFixed(4)}</span>
+                </div>
+                <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden mb-1.5">
+                  <div class="${barColor} h-1.5 rounded-full" style="width: ${Math.min(100, Math.max(2, parseFloat(sharePct)))}%"></div>
+                </div>
+                <div class="text-[10px] text-gray-400 font-mono flex justify-between">
+                  <span>Tokens: ${c.tokens.toLocaleString()}</span>
+                  <span>In:${c.prompt} Out:${c.completion} Think:${c.thoughts}</span>
+                </div>
+                ${toolPills ? `<div class="mt-2 pt-1.5 border-t border-gray-800/80 flex flex-wrap gap-1">${toolPills}</div>` : ''}
               </div>
-              <div class="flex items-center justify-between text-[11px] text-gray-400 mb-1.5">
-                <span class="truncate">Model: <span class="text-gray-300 font-mono">${[...c.models].join(', ') || 'default'}</span></span>
-                <span class="text-cyan-300 font-mono">${sharePct}% of parent</span>
+            `;
+          }).join('');
+
+          const rootBorder = isSelectedRoot ? 'border-indigo-500 ring-1 ring-indigo-500/60' : 'border-gray-800';
+          return `
+            <div class="rounded-xl border ${rootBorder} bg-gray-950/60 p-4">
+              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-3 mb-3 border-b border-gray-800/80">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <span class="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-950 text-amber-300 border border-amber-700/80">
+                    ∑ PARENT LEVEL ROLLUP
+                  </span>
+                  <span class="text-sm font-bold text-white font-mono">👑 ${rName}</span>
+                  <span class="text-xs text-gray-400">
+                    (${subCount} Sub-Agent${subCount === 1 ? '' : 's'} • ${info.sessions.size} Session${info.sessions.size === 1 ? '' : 's'})
+                  </span>
+                </div>
+                <div class="flex flex-wrap items-center gap-4">
+                  <div class="text-right">
+                    <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Spend</div>
+                    <div class="text-sm font-bold text-amber-300 font-mono">$${parentTotalCost.toFixed(5)}</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Tokens</div>
+                    <div class="text-sm font-bold text-indigo-300 font-mono">${parentTotalTokens.toLocaleString()}</div>
+                  </div>
+                  <button onclick="selectHierarchyTarget('${rName}', 'ALL')" class="text-xs px-3 py-1.5 rounded-lg font-medium ${isSelectedRoot ? 'bg-indigo-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-indigo-300 border border-gray-700'}">
+                    ${isSelectedRoot ? '✓ Viewing Parent Rollup' : 'Filter Root & Show Sub-Agents'}
+                  </button>
+                </div>
               </div>
-              <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden mb-1.5">
-                <div class="${barColor} h-1.5 rounded-full" style="width: ${Math.min(100, Math.max(2, parseFloat(sharePct)))}%"></div>
-              </div>
-              <div class="text-[10px] text-gray-400 font-mono flex justify-between">
-                <span>Tokens: ${c.tokens.toLocaleString()}</span>
-                <span>In:${c.prompt} Out:${c.completion} Think:${c.thoughts}</span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                ${childrenHtml}
               </div>
             </div>
           `;
         }).join('');
+      }
 
-        const rootBorder = isSelectedRoot ? 'border-indigo-500 ring-1 ring-indigo-500/60' : 'border-gray-800';
-        return `
-          <div class="rounded-xl border ${rootBorder} bg-gray-950/60 p-4">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-3 mb-3 border-b border-gray-800/80">
-              <div class="flex flex-wrap items-center gap-2.5">
-                <span class="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-950 text-amber-300 border border-amber-700/80">
-                  ∑ PARENT LEVEL ROLLUP
-                </span>
-                <span class="text-sm font-bold text-white font-mono">👑 ${rName}</span>
-                <span class="text-xs text-gray-400">
-                  (${subCount} Sub-Agent${subCount === 1 ? '' : 's'} • ${info.sessions.size} Session${info.sessions.size === 1 ? '' : 's'})
-                </span>
-              </div>
-              <div class="flex flex-wrap items-center gap-4">
-                <div class="text-right">
-                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Spend</div>
-                  <div class="text-sm font-bold text-amber-300 font-mono">$${parentTotalCost.toFixed(5)}</div>
-                </div>
-                <div class="text-right">
-                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Tokens</div>
-                  <div class="text-sm font-bold text-indigo-300 font-mono">${parentTotalTokens.toLocaleString()}</div>
-                </div>
-                <button onclick="selectHierarchyTarget('${rName}', 'ALL')" class="text-xs px-3 py-1.5 rounded-lg font-medium ${isSelectedRoot ? 'bg-indigo-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-indigo-300 border border-gray-700'}">
-                  ${isSelectedRoot ? '✓ Viewing Parent Rollup' : 'Filter Root & Show Sub-Agents'}
-                </button>
-              </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              ${childrenHtml}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+      function renderToolBreakdownTable(rows) {
+        const agg = {};
+        let totalCalls = 0;
+        let totalFee = 0;
 
-    function updateCharts(effCost, wastedCost, savedCost, agentMap, modelMap) {
-      // 1. Efficiency Chart
-      const effCtx = document.getElementById('efficiencyChart');
-      if (effChart) effChart.destroy();
-      effChart = new Chart(effCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Effective Spend ($)', 'Wasted Spend ($)', 'Cache Savings ($)'],
-          datasets: [{
-            data: [effCost, wastedCost, savedCost],
-            backgroundColor: ['#10b981', '#f43f5e', '#f59e0b'],
-            borderWidth: 0
-          }]
-        },
-        options: { plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } } } }
-      });
+        rows.forEach(r => {
+          const bbt = r.breakdown_by_tool || {};
+          Object.entries(bbt).forEach(([aName, tMap]) => {
+            if (r.agent_name && r.agent_name !== aName) return;
+            if (tMap && typeof tMap === 'object') {
+              Object.entries(tMap).forEach(([tName, stats]) => {
+                const key = `${aName}:::${tName}`;
+                if (!agg[key]) agg[key] = { agent: aName, tool: tName, calls: 0, cost: 0 };
+                const calls = (stats && stats.calls) || 0;
+                const cost = (stats && stats.total_cost_usd) || 0;
+                agg[key].calls += calls;
+                agg[key].cost += cost;
+                totalCalls += calls;
+                totalFee += cost;
+              });
+            }
+          });
+        });
 
-      // 2. Agent Chart
-      const aNames = Object.keys(agentMap);
-      const agCtx = document.getElementById('agentChart');
-      if (agentChart) agentChart.destroy();
-      agentChart = new Chart(agCtx, {
-        type: 'bar',
-        data: {
-          labels: aNames,
-          datasets: [
-            { label: 'LLM Cost ($)', data: aNames.map(a => agentMap[a].llm), backgroundColor: '#6366f1' },
-            { label: 'Tool/Grounding ($)', data: aNames.map(a => agentMap[a].tool), backgroundColor: '#ec4899' }
-          ]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { stacked: true, ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } },
-            y: { stacked: true, ticks: { color: '#e5e7eb' }, grid: { display: false } }
+        document.getElementById('toolCountBadge').innerText = `${totalCalls} tool call(s) ($${totalFee.toFixed(4)})`;
+        const tbody = document.getElementById('toolBreakdownBody');
+        const entries = Object.values(agg).sort((a, b) => b.cost - a.cost);
+        if (entries.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="py-3 px-4 text-gray-500 text-center">No billable tool or grounding calls in current filter scope.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = entries.map(item => {
+          const avg = item.calls > 0 ? item.cost / item.calls : 0;
+          return `<tr class="hover:bg-gray-900/50">
+            <td class="py-2 px-4 text-cyan-300 font-semibold">🤖 ${item.agent}</td>
+            <td class="py-2 px-4 text-emerald-300">🔧 ${item.tool}</td>
+            <td class="py-2 px-4 text-right text-gray-200">${item.calls}</td>
+            <td class="py-2 px-4 text-right text-gray-400">$${avg.toFixed(4)}</td>
+            <td class="py-2 px-4 text-right font-bold text-amber-300">$${item.cost.toFixed(4)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      function updateCharts(effCost, wastedCost, savedCost, agentMap, modelMap) {
+        // 1. Efficiency Chart
+        const effCtx = document.getElementById('efficiencyChart');
+        if (effChart) effChart.destroy();
+        effChart = new Chart(effCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Effective Spend ($)', 'Wasted Spend ($)', 'Cache Savings ($)'],
+            datasets: [{
+              data: [effCost, wastedCost, savedCost],
+              backgroundColor: ['#10b981', '#f43f5e', '#f59e0b'],
+              borderWidth: 0
+            }]
           },
-          plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } }
-        }
-      });
+          options: { plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } } } }
+        });
 
-      // 3. Model Chart
-      const mNames = Object.keys(modelMap);
-      const mCtx = document.getElementById('modelChart');
-      if (modelChart) modelChart.destroy();
-      modelChart = new Chart(mCtx, {
-        type: 'bar',
-        data: {
-          labels: mNames,
-          datasets: [
-            { label: 'Prompt', data: mNames.map(m => modelMap[m].prompt), backgroundColor: '#3b82f6' },
-            { label: 'Completion', data: mNames.map(m => modelMap[m].completion), backgroundColor: '#10b981' },
-            { label: 'Thinking', data: mNames.map(m => modelMap[m].thoughts), backgroundColor: '#a855f7' },
-            { label: 'Cached', data: mNames.map(m => modelMap[m].cached), backgroundColor: '#f59e0b' }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { stacked: true, ticks: { color: '#e5e7eb' } },
-            y: { stacked: true, ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } }
+        // 2. Agent Chart
+        const aNames = Object.keys(agentMap);
+        const agCtx = document.getElementById('agentChart');
+        if (agentChart) agentChart.destroy();
+        agentChart = new Chart(agCtx, {
+          type: 'bar',
+          data: {
+            labels: aNames,
+            datasets: [
+              { label: 'LLM Cost ($)', data: aNames.map(a => agentMap[a].llm), backgroundColor: '#6366f1' },
+              { label: 'Tool/Grounding ($)', data: aNames.map(a => agentMap[a].tool), backgroundColor: '#ec4899' }
+            ]
           },
-          plugins: { legend: { labels: { color: '#9ca3af', font: { size: 10 } } } }
-        }
-      });
-    }
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { stacked: true, ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } },
+              y: { stacked: true, ticks: { color: '#e5e7eb' }, grid: { display: false } }
+            },
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } }
+          }
+        });
 
-    function renderTable(rows) {
-      document.getElementById('rowCountBadge').innerText = `${rows.length} records`;
-      const tbody = document.getElementById('telemetryBody');
-      tbody.innerHTML = rows.slice(0, 100).map(r => {
-        const badgeClass = r.is_failure
-          ? 'bg-rose-950 text-rose-400 border-rose-800'
-          : 'bg-emerald-950 text-emerald-400 border-emerald-800';
-        const outcomeLabel = (r.status || 'success').toUpperCase();
-        const ts = (r.timestamp || '').replace('T', ' ').slice(0, 19);
-        const rootLabel = `<span class="text-indigo-300 font-semibold">👑 ${r.root_agent_name || 'root_agent'}</span>`;
-        let agentRoleCell = '';
-        if (!r.agent_name) {
-          agentRoleCell = `<span class="px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/80 text-[11px] font-bold">∑ OVERALL PARENT TOTAL (${r.root_agent_name || 'root'})</span>`;
-        } else if (r.agent_name === r.root_agent_name) {
-          agentRoleCell = `<span class="text-indigo-200 font-semibold">👑 ${r.agent_name} <span class="text-[10px] text-indigo-400">[ROOT DIRECT]</span></span>`;
-        } else {
-          agentRoleCell = `<span class="text-cyan-300">↳ 🤖 ${r.agent_name} <span class="text-[10px] text-gray-400">[SUB-AGENT]</span></span>`;
-        }
-        return `<tr class="hover:bg-gray-900/50 ${!r.agent_name ? 'bg-amber-950/10' : ''}">
-          <td class="py-2 px-3 text-gray-400">${ts}</td>
-          <td class="py-2 px-3 text-indigo-300 font-medium">${r.session_id}</td>
-          <td class="py-2 px-3">${rootLabel}</td>
-          <td class="py-2 px-3">${agentRoleCell}</td>
-          <td class="py-2 px-3 text-gray-300">${r.model_name || 'ALL'}</td>
-          <td class="py-2 px-3"><span class="px-2 py-0.5 rounded border text-[10px] font-semibold ${badgeClass}">${outcomeLabel}</span></td>
-          <td class="py-2 px-3 text-right text-gray-300">${(r.total_tokens||0).toLocaleString()} <span class="text-gray-500">(${r.prompt_tokens}/${r.completion_tokens}/${r.thoughts_tokens})</span></td>
-          <td class="py-2 px-3 text-right text-amber-400">${(r.cached_tokens||0).toLocaleString()}</td>
-          <td class="py-2 px-3 text-right font-semibold text-white">$${(r.total_cost_usd||0).toFixed(6)}</td>
-          <td class="py-2 px-3 text-right text-emerald-400">${r.savings_usd > 0 ? '$' + r.savings_usd.toFixed(6) : '—'}</td>
-          <td class="py-2 px-3 text-gray-400 truncate max-w-xs" title="${r.error || r.source}">${r.error ? '<span class="text-rose-400">⚠️ ' + r.error + '</span>' : r.source}</td>
-        </tr>`;
-      }).join('');
-    }
+        // 3. Model Chart
+        const mNames = Object.keys(modelMap);
+        const mCtx = document.getElementById('modelChart');
+        if (modelChart) modelChart.destroy();
+        modelChart = new Chart(mCtx, {
+          type: 'bar',
+          data: {
+            labels: mNames,
+            datasets: [
+              { label: 'Prompt', data: mNames.map(m => modelMap[m].prompt), backgroundColor: '#3b82f6' },
+              { label: 'Completion', data: mNames.map(m => modelMap[m].completion), backgroundColor: '#10b981' },
+              { label: 'Thinking', data: mNames.map(m => modelMap[m].thoughts), backgroundColor: '#a855f7' },
+              { label: 'Cached', data: mNames.map(m => modelMap[m].cached), backgroundColor: '#f59e0b' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { stacked: true, ticks: { color: '#e5e7eb' } },
+              y: { stacked: true, ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } }
+            },
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 10 } } } }
+          }
+        });
+      }
+
+      function renderTable(rows) {
+        document.getElementById('rowCountBadge').innerText = `${rows.length} records`;
+        const tbody = document.getElementById('telemetryBody');
+        tbody.innerHTML = rows.slice(0, 100).map(r => {
+          const badgeClass = r.is_failure
+            ? 'bg-rose-950 text-rose-400 border-rose-800'
+            : 'bg-emerald-950 text-emerald-400 border-emerald-800';
+          const outcomeLabel = (r.status || 'success').toUpperCase();
+          const ts = (r.timestamp || '').replace('T', ' ').slice(0, 19);
+          const rootLabel = `<span class="text-indigo-300 font-semibold">👑 ${r.root_agent_name || 'root_agent'}</span>`;
+          let agentRoleCell = '';
+          if (!r.agent_name) {
+            agentRoleCell = `<span class="px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/80 text-[11px] font-bold">∑ OVERALL PARENT TOTAL (${r.root_agent_name || 'root'})</span>`;
+          } else if (r.agent_name === r.root_agent_name) {
+            agentRoleCell = `<span class="text-indigo-200 font-semibold">👑 ${r.agent_name} <span class="text-[10px] text-indigo-400">[ROOT DIRECT]</span></span>`;
+          } else {
+            agentRoleCell = `<span class="text-cyan-300">↳ 🤖 ${r.agent_name} <span class="text-[10px] text-gray-400">[SUB-AGENT]</span></span>`;
+          }
+          const tCalls = r.tool_calls_count || 0;
+          const tCost = r.tool_cost_usd || 0;
+          const toolCell = tCalls > 0
+            ? `<span class="text-emerald-300">${tCalls} call${tCalls === 1 ? '' : 's'} ($${tCost.toFixed(4)})</span>`
+            : `<span class="text-gray-600">—</span>`;
+          return `<tr class="hover:bg-gray-900/50 ${!r.agent_name ? 'bg-amber-950/10' : ''}">
+            <td class="py-2 px-3 text-gray-400">${ts}</td>
+            <td class="py-2 px-3 text-indigo-300 font-medium">${r.session_id}</td>
+            <td class="py-2 px-3">${rootLabel}</td>
+            <td class="py-2 px-3">${agentRoleCell}</td>
+            <td class="py-2 px-3 text-gray-300">${r.model_name || 'ALL'}</td>
+            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded border text-[10px] font-semibold ${badgeClass}">${outcomeLabel}</span></td>
+            <td class="py-2 px-3 text-right text-gray-300">${(r.total_tokens||0).toLocaleString()} <span class="text-gray-500">(${r.prompt_tokens}/${r.completion_tokens}/${r.thoughts_tokens})</span></td>
+            <td class="py-2 px-3 text-right text-amber-400">${(r.cached_tokens||0).toLocaleString()}</td>
+            <td class="py-2 px-3 text-right">${toolCell}</td>
+            <td class="py-2 px-3 text-right font-semibold text-white">$${(r.total_cost_usd||0).toFixed(6)}</td>
+            <td class="py-2 px-3 text-right text-emerald-400">${r.savings_usd > 0 ? '$' + r.savings_usd.toFixed(6) : '—'}</td>
+            <td class="py-2 px-3 text-gray-400 truncate max-w-xs" title="${r.error || r.source}">${r.error ? '<span class="text-rose-400">⚠️ ' + r.error + '</span>' : r.source}</td>
+          </tr>`;
+        }).join('');
+      }
 
     fetchMetrics();
     setInterval(() => { if (!isPaused) fetchMetrics(); }, 2000);

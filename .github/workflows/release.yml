@@ -53,9 +53,9 @@ jobs:
           python -m pip install --upgrade pip build twine pytest
           pip install -e ".[rich]"
 
-      - name: Run rate card & pricing unit tests
+      - name: Run rate card & tool billing unit tests
         run: |
-          pytest tests/test_rate_card.py -q
+          pytest tests/test_rate_card.py tests/test_plugin.py -q
 
       - name: Resolve or auto-bump package version
         id: version

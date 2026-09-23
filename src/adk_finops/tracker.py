@@ -432,6 +432,7 @@ class CostTracker:
             "currency": "USD",
             "breakdown_by_model": {},
             "breakdown_by_agent": {},
+            "breakdown_by_tool": {},
             "breakdown_by_task": {},
         }
 
@@ -516,6 +517,8 @@ class CostTracker:
                     "savings_pct": 0.0,
                     "models": [],
                     "model_name": None,
+                    "tools": {},
+                    "breakdown_by_tool": {},
                     "root_agent_name": eff_root,
                     "parent_agent_name": eff_parent,
                     "agent_role": "root_self" if agent_name == eff_root else "sub_agent",
@@ -561,11 +564,24 @@ class CostTracker:
         total_tool_fee: float,
         task_name: str | None,
         agent_name: str | None = None,
+        tool_name: str | None = None,
     ) -> None:
         run["total_tool_calls"] += count
         run["tool_cost_usd"] = round(run["tool_cost_usd"] + total_tool_fee, 7)
         run["total_cost_usd"] = round(run["total_cost_usd"] + total_tool_fee, 7)
         run["gross_cost_usd"] = round(run.get("gross_cost_usd", 0.0) + total_tool_fee, 7)
+
+        eff_tool = (task_name or tool_name or "tool").strip()
+        eff_agent_key = (agent_name or run.get("root_agent_name") or "root_agent").strip()
+
+        tool_bd = run.setdefault("breakdown_by_tool", {})
+        agent_tools = tool_bd.setdefault(eff_agent_key, {})
+        t_item = agent_tools.setdefault(
+            eff_tool,
+            {"calls": 0, "total_cost_usd": 0.0},
+        )
+        t_item["calls"] += count
+        t_item["total_cost_usd"] = round(t_item["total_cost_usd"] + total_tool_fee, 7)
 
         if agent_name:
             if not run.get("root_agent_name"):
@@ -590,6 +606,8 @@ class CostTracker:
                     "gross_cost_usd": 0.0,
                     "savings_usd": 0.0,
                     "savings_pct": 0.0,
+                    "tools": {},
+                    "breakdown_by_tool": {},
                     "root_agent_name": eff_root,
                     "parent_agent_name": eff_parent,
                     "agent_role": "root_self" if agent_name == eff_root else "sub_agent",
@@ -602,6 +620,11 @@ class CostTracker:
             a["tool_cost_usd"] = round(a["tool_cost_usd"] + total_tool_fee, 7)
             a["total_cost_usd"] = round(a["total_cost_usd"] + total_tool_fee, 7)
             a["gross_cost_usd"] = round(a.get("gross_cost_usd", 0.0) + total_tool_fee, 7)
+            a_tools = a.setdefault("tools", {})
+            at_item = a_tools.setdefault(eff_tool, {"calls": 0, "total_cost_usd": 0.0})
+            at_item["calls"] += count
+            at_item["total_cost_usd"] = round(at_item["total_cost_usd"] + total_tool_fee, 7)
+            a["breakdown_by_tool"] = {agent_name: copy.deepcopy(a_tools)}
 
         if task_name:
             t = run["breakdown_by_task"].setdefault(
@@ -742,8 +765,9 @@ class CostTracker:
         custom_cost_usd: float | None = None,
         session_id: str | None = None,
         agent_name: str | None = None,
+        provider: str | None = None,
     ) -> float:
-        """Records fixed fees for tools, web search, or grounding calls.
+        """Records fixed or dynamic fees for tools, web search, or grounding calls.
         If both run_id (turn) and session_id (session) are provided, records to both.
         """
         if not cls._enabled:
@@ -751,7 +775,8 @@ class CostTracker:
 
         clean_tool = tool_name.strip().lower()
         if custom_cost_usd is not None:
-            unit_rate = float(custom_cost_usd)
+            disc = cls._registry.get_effective_discount(provider or "custom_tool")
+            unit_rate = round(float(custom_cost_usd) * disc, 7)
         else:
             unit_rate = cls._registry.get_tool_fee(clean_tool)
 
@@ -767,6 +792,7 @@ class CostTracker:
                 total_tool_fee=total_tool_fee,
                 task_name=task_name,
                 agent_name=agent_name,
+                tool_name=clean_tool,
             )
 
             if session_id and session_id != effective_id:
@@ -778,6 +804,7 @@ class CostTracker:
                     total_tool_fee=total_tool_fee,
                     task_name=task_name,
                     agent_name=agent_name,
+                    tool_name=clean_tool,
                 )
 
         return total_tool_fee

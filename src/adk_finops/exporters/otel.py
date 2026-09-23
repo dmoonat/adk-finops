@@ -198,6 +198,10 @@ class OpenTelemetryExporter(BaseExporter):
             attrs["gen_ai.agent.name"] = str(row["agent_name"])
         if row.get("model_name"):
             attrs["gen_ai.request.model"] = str(row["model_name"])
+        if row.get("tool_calls_count") is not None:
+            attrs["gen_ai.usage.tool_calls_count"] = int(row["tool_calls_count"])
+        if row.get("breakdown_by_tool"):
+            attrs["gen_ai.finops.breakdown_by_tool"] = str(row["breakdown_by_tool"])
         if row.get("budget_utilization_pct") is not None:
             attrs["gen_ai.finops.budget_utilization_pct"] = float(
                 row["budget_utilization_pct"]

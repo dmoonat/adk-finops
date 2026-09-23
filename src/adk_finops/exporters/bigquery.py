@@ -67,6 +67,7 @@ class BigQueryExporter(BaseExporter):
         ("budget_exceeded", "BOOLEAN", "REQUIRED", "Whether budget guard was tripped"),
         ("breakdown_by_agent", "JSON", "NULLABLE", "Multi-agent cost and token attribution"),
         ("breakdown_by_model", "JSON", "NULLABLE", "Model cost and token distribution"),
+        ("breakdown_by_tool", "JSON", "NULLABLE", "Tool call count and cost attribution by agent and tool"),
         ("tags", "JSON", "NULLABLE", "Custom user-provided tags (e.g. env, tenant_id)"),
     ]
 
@@ -137,9 +138,24 @@ class BigQueryExporter(BaseExporter):
                 except Exception as e:
                     logger.debug(f"[FinOps BigQuery] Dataset check/create notice: {e}")
 
-            # 2. Ensure table exists
+            # 2. Ensure table exists (and auto-add any new NULLABLE schema columns such as breakdown_by_tool)
             try:
-                client.get_table(table_ref)
+                existing_table = client.get_table(table_ref)
+                existing_names = {f.name for f in existing_table.schema}
+                missing_fields = [
+                    f for f in self._build_bq_schema() if f.name not in existing_names
+                ]
+                if missing_fields:
+                    try:
+                        existing_table.schema = list(existing_table.schema) + missing_fields
+                        client.update_table(existing_table, ["schema"])
+                        logger.info(
+                            f"[FinOps BigQuery] Upgraded table schema for {self.table_id} with {[f.name for f in missing_fields]}"
+                        )
+                    except Exception as schema_err:
+                        logger.debug(
+                            f"[FinOps BigQuery] Schema upgrade notice for {self.table_id}: {schema_err}"
+                        )
                 self._table_verified = True
             except Exception:
                 table = bigquery.Table(table_ref, schema=self._build_bq_schema())
@@ -186,6 +202,9 @@ class BigQueryExporter(BaseExporter):
         # Handle breakdowns
         breakdown_by_agent = scope_data.get("breakdown_by_agent")
         breakdown_by_model = scope_data.get("breakdown_by_model")
+        breakdown_by_tool = scope_data.get("breakdown_by_tool")
+        if not breakdown_by_tool and isinstance(scope_data.get("tools"), dict) and scope_data.get("tools"):
+            breakdown_by_tool = {agent_name or "root_agent": scope_data["tools"]}
 
         return {
             "timestamp": now_utc,
@@ -211,6 +230,7 @@ class BigQueryExporter(BaseExporter):
             "budget_exceeded": b_exceeded,
             "breakdown_by_agent": json.dumps(breakdown_by_agent) if breakdown_by_agent else None,
             "breakdown_by_model": json.dumps(breakdown_by_model) if breakdown_by_model else None,
+            "breakdown_by_tool": json.dumps(breakdown_by_tool) if breakdown_by_tool else None,
             "tags": json.dumps(tags) if tags else None,
         }
 
@@ -303,9 +323,9 @@ class BigQueryExporter(BaseExporter):
                     f"[FinOps BigQuery] Errors occurred while streaming rows into {self.table_id}: {errors}"
                 )
             else:
-                logger.debug(
-                    f"[FinOps BigQuery] Successfully exported {len(rows)} rows to {self.table_id}"
-                )
+                msg = f"[FinOps BigQuery] Exported {len(rows)} row(s) to {self.table_id}"
+                print(msg, flush=True)
+                logger.info(msg)
         except Exception as e:
             logger.error(f"[FinOps BigQuery] Failed to stream rows to {self.table_id}: {e}")
 

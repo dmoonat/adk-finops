@@ -24,6 +24,8 @@
 - [Task Outcome & Wasted Spend Analytics (Success vs. Failure)](#task-outcome--wasted-spend-analytics-success-vs-failure)
 - [Context Caching Savings Analytics (ROI Tracker)](#context-caching-savings-analytics-roi-tracker)
 - [Multi-Agent Cost Attribution & Delegation Tracking](#multi-agent-cost-attribution--delegation-tracking)
+  - [Hierarchical Root (Parent) Agent ➔ Sub-Agent Attribution](#hierarchical-root-parent-agent--sub-agent-attribution)
+  - [Real-Time Terminal Logs](#real-time-terminal-logs)
 - [Automated FinOps Optimization Advisor](#automated-finops-optimization-advisor)
 - [Rich Terminal Summary Box](#rich-terminal-summary-box)
   - [Automatic & On-Demand Integration](#automatic--on-demand-integration)
@@ -33,17 +35,20 @@
   - [3. Remote URL / Enterprise Pricing Endpoint](#3-remote-url--enterprise-pricing-endpoint)
   - [4. Enterprise Negotiated Discounts](#4-enterprise-negotiated-discounts)
   - [5. Programmatic Model & Tool Registration](#5-programmatic-model--tool-registration)
-- [Smart Tool Classification (MCP vs. Grounding)](#smart-tool-classification-mcp-vs-grounding)
-- [Gemini 2.5 Thinking Tokens Billing](#gemini-25-thinking-tokens-billing)
-- [Telemetry State Schema](#telemetry-state-schema)
+  - [6. Regional (`non_global`) & Date-Tiered (`2027`) Pricing](#6-regional-non_global--date-tiered-2027-pricing)
+  - [7. Dynamic Remote Rate Card Syncing & Google Cloud Pricing Extraction Framework](#7-dynamic-remote-rate-card-syncing--google-cloud-pricing-extraction-framework)
+- [Smart Tool Classification & Explicit Tool Billing (`@billable`)](#smart-tool-classification--explicit-tool-billing-billable)
+- [Gemini 2.5 & 3.x Thinking Tokens Billing](#gemini-25--3x-thinking-tokens-billing)
 - [Standalone Usage (Without ADK)](#standalone-usage-without-adk)
 - [Configuration Reference](#configuration-reference)
 - [Built-In Model Rate Cards](#built-in-model-rate-cards)
-- [Flexible Exporters (Local, Cloud & OpenTelemetry)](#one-line-bigquery-exporter)
-  - [Near-Live FinOps Web Dashboard (`adk-finops dashboard`)](#near-live-finops-web-dashboard-adk-finops-dashboard)
+- [One-Line BigQuery Exporter](#one-line-bigquery-exporter)
   - [Zero-Boilerplate Schema Management](#zero-boilerplate-schema-management)
-  - [Standalone Exporter Usage](#standalone-exporter-usage)
+  - [Understanding Streamed Rows & Dimensions (Rollup vs. Attributed Rows)](#understanding-streamed-rows--dimensions-rollup-vs-attributed-rows)
+  - [Near-Live FinOps Web Dashboard (`adk-finops dashboard`)](#near-live-finops-web-dashboard-adk-finops-dashboard)
+  - [Cloud-Agnostic & Local Exporters (`JSONL`, `CSV`, `OpenTelemetry`)](#cloud-agnostic--local-exporters-jsonl-csv-opentelemetry)
   - [Sample SQL Queries for Looker Studio](#sample-sql-queries-for-looker-studio)
+- [Limitations & Roadmap (Next Release)](#limitations--roadmap-next-release)
 - [License](#license)
 
 ---
@@ -72,7 +77,7 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
 - **Enterprise Volume Discounts**: Configure global or provider-specific discount multipliers (e.g., 15% Google Cloud negotiated discount).
 - **Accurate Thinking Tokens**: Automatically captures and bills `thoughts_token_count` at the output rate while displaying thinking tokens separately in reports.
-- **Smart Tool Discrimination**: Automatically excludes `MCPTool`, `McpToolset`, BigQuery, and local function tools (\$0.00 fee) while accurately billing Google Search Grounding (\$0.014/query) and Vertex AI Search (\$0.0025/prompt).
+- **Explicit Tool Billing (`@billable`) & Per-Tool Attribution (`breakdown_by_tool`)**: Decorate custom functions/classes with `@billable(fee=...)` or `@billable(fee_fn=...)` (with automatic `charge_on_error=False` protection), register rates via `CostTracker.register_tool_rate` / `tool_rates`, and track per-agent tool call counts and fees (`Agent -> Tool -> #Calls -> Cost`) across the Rich terminal box, BigQuery, local logs, OpenTelemetry, and the web dashboard.
 - **Real-Time UI Streaming**: Streams cost metrics to `event.actions.state_delta["finops_cost"]` for live updates in the ADK Web UI, with formatted terminal stdout logging.
 - **Zero Heavy Dependencies**: Pure Python standard library for the core tracker.
 
@@ -406,7 +411,27 @@ Every turn and session summary includes this hierarchy inside `breakdown_by_agen
       "savings_usd": 0.0,
       "root_agent_name": "supervisor",
       "parent_agent_name": "supervisor",
-      "agent_role": "sub_agent"
+      "agent_role": "sub_agent",
+      "tools": {
+        "patent_search": {
+          "calls": 2,
+          "total_cost_usd": 0.03
+        }
+      }
+    }
+  },
+  "breakdown_by_tool": {
+    "researcher": {
+      "google_search": {
+        "calls": 2,
+        "total_cost_usd": 0.028
+      }
+    },
+    "coder": {
+      "patent_search": {
+        "calls": 2,
+        "total_cost_usd": 0.03
+      }
     }
   }
 }
@@ -417,8 +442,10 @@ Every turn and session summary includes this hierarchy inside `breakdown_by_agen
 ```text
 [FinOps LLM] turn=turn_1 session=sess_1 agent=supervisor model=gemini-2.5-pro tokens=1200 cost=$0.002250
 [FinOps Grounding] turn=turn_1 session=sess_1 agent=researcher tool=google_search fee=$0.014000
+[FinOps Tool] turn=turn_1 session=sess_1 agent=coder tool=patent_search fee=$0.015000
 [FinOps LLM] turn=turn_1 session=sess_1 agent=researcher model=gemini-2.5-flash tokens=4500 cost=$0.001890 | 💰 Saved $0.000540 (22.2%) via Context Caching
-[FinOps Agents] supervisor: $0.0023 (1200 tok) | researcher: $0.0299 (4500 tok) | coder: $0.0128 (9800 tok)
+[FinOps Agents] supervisor: $0.0023 (1200 tok) | researcher: $0.0299 (4500 tok) | coder: $0.0428 (9800 tok)
+[FinOps Tools] researcher -> google_search: 2 calls ($0.0280) | coder -> patent_search: 2 calls ($0.0300)
 ```
 
 ---
@@ -465,17 +492,17 @@ export ADK_FINOPS_OPTIMIZATION_ADVISOR="false"
 
 ## Rich Terminal Summary Box
 
-`adk-finops` includes an out-of-the-box, color-coded, border-styled terminal summary box. When running in a terminal, it provides instant financial visibility after every turn, displaying turn vs. session costs, context caching ROI, model breakdowns, and sub-agent attributions:
+`adk-finops` includes an out-of-the-box, color-coded, border-styled terminal summary box. When running in a terminal, it provides instant financial visibility after every turn, displaying turn vs. session costs, context caching ROI, model breakdowns, sub-agent attributions, and per-tool cost breakdowns (`Agent -> Tool -> Calls -> Tool Cost`):
 
 ```text
 ╭───────────────────────── 💸 ADK FinOps Cost Summary ─────────────────────────╮
 │                                                                              │
 │  Scope           Calls   Tokens   LLM Cost   Tool Fees   Total Cost          │
 │  ──────────────────────────────────────────────────────────────────          │
-│  Current Turn        2   10,100    $0.0053     $0.0280      $0.0333          │
-│  Session Total       2   10,100    $0.0053     $0.0280      $0.0333          │
+│  Current Turn        2   10,100    $0.0053     $0.0290      $0.0343          │
+│  Session Total       2   10,100    $0.0053     $0.0290      $0.0343          │
 │                                                                              │
-│  💰 Context Caching Savings: $0.0016 saved (4.6% reduction from $0.0349 gross)│
+│  💰 Context Caching Savings: $0.0016 saved (4.5% reduction from $0.0359 gross)│
 │                                                                              │
 │  Model              Calls   Tokens (In/Out)   Cost (USD)           Savings   │
 │  ─────────────────────────────────────────────────────────────────────────   │
@@ -484,11 +511,16 @@ export ADK_FINOPS_OPTIMIZATION_ADVISOR="false"
 │                                                                              │
 │  Agent             Calls   Tokens   LLM Cost   Tool Fees   Total Cost        │
 │  ────────────────────────────────────────────────────────────────────        │
-│  🤖 researcher         4   14,400    $0.0078       $0.00      $0.0078        │
+│  🤖 researcher         4   14,400    $0.0078     $0.0290      $0.0368        │
 │  🤖 router_agent       1    5,900    $0.0130       $0.00      $0.0130        │
 │  🤖 formatter          1    1,610    $0.0024       $0.00      $0.0024        │
 │                                                                              │
-│  🛡️  Budget Guard: $0.0233 / $1.0000 (2.3% utilized)                         │
+│  Agent             Tool                             Calls   Tool Cost        │
+│  ────────────────────────────────────────────────────────────────────        │
+│  🤖 researcher     🔧 patent_search                     1     $0.0150        │
+│  🤖 researcher     🔧 google_search                     1     $0.0140        │
+│                                                                              │
+│  🛡️  Budget Guard: $0.0343 / $1.0000 (3.4% utilized)                         │
 │                                                                              │
 │  💡 Optimization Insights (Est. Savings: $0.0148 | 63.6% cut available)      │
 │   ⚡ Context Caching Opportunity: Agent 'researcher' sent >12k uncached      │
@@ -729,15 +761,43 @@ status = CostTracker.sync_remote_rate_card(force=True)
 
 ---
 
-## Smart Tool Classification (MCP vs. Grounding)
+## Smart Tool Classification & Explicit Tool Billing (`@billable`)
 
-`adk-finops` distinguishes between paid cloud grounding services and free tools:
+`adk-finops` distinguishes between paid cloud grounding services (`[FinOps Grounding]`), explicitly billed custom/MCP tools (`[FinOps Tool]`), and free tools:
 
-- **MCP Tools (`McpToolset`, `MCPTool`)**: Automatically identified and assigned **\$0.00** fee (e.g. `search_documents`).
-- **Database & Custom Tools**: BigQuery toolsets and custom Python functions incur **\$0.00** tool fee.
-- **Google Search Grounding & Web Grounding**: Tools named `google_search` or `GoogleSearchTool` incur **\$0.014 / query** (\$14.00 per 1,000 queries; first 5,000 queries/month free). Charged for each individual Grounding Query performed by Gemini. Input tokens returned by search grounding are not charged.
-- **Google Maps Grounding**: Incurs **\$0.014 / query** (\$14.00 per 1,000 queries; first 5,000 queries/month free). Input tokens are not charged.
-- **Grounding with your data (Vertex AI Search / Datastores)**: Tools matching `vertex_search`, `vertex_ai_search`, or `GroundingTool` incur **\$0.0025 / prompt** (\$2.50 per 1,000 prompts).
+- **Explicit `@billable` Decorator (`from adk_finops import billable`) & Tool Rate Registration**: Attach fixed per-call fees or dynamic per-result fees (`fee_fn`) directly to Python tool functions or custom ADK `BaseTool` classes, with built-in error protection (`charge_on_error=False` by default so failed API calls return `$0.00` fee), or register tool pricing via `FinOpsCostPlugin(tool_rates=...)` and `CostTracker.register_tool_rate(...)`:
+  ```python
+  from adk_finops import CostTracker, FinOpsCostPlugin, billable
+
+  # 1. Fixed per-call fee ($0.015 per invocation)
+  @billable(fee=0.015, provider="serpapi")
+  def patent_search(query: str) -> dict:
+      """Searches external patent database."""
+      return {"hits": 10}
+
+  # 2. Dynamic per-unit fee ($0.002 per page OCR'd; $0.00 if result has {"status": "error"})
+  @billable(
+      fee_fn=lambda args, res: 0.002 * len(res.get("pages", [])),
+      charge_on_error=False,
+  )
+  def ocr_document(gcs_uri: str) -> dict:
+      """Extracts text from PDF pages via paid OCR service."""
+      return {"pages": ["page1", "page2", "page3"]}
+
+  # 3. Global programmatic tool rate registration
+  CostTracker.register_tool_rate("enterprise_risk_score_api", 0.025)
+
+  # 4. Plugin-level tool_rates (ideal for paid third-party MCP tools)
+  finops_plugin = FinOpsCostPlugin(
+      default_model="gemini-2.5-pro",
+      tool_rates={"bloomberg_mcp_terminal": 0.05},
+  )
+  ```
+- **Per-Agent Tool Cost Attribution (`breakdown_by_tool`)**: Every turn and session tracks `{agent_name: {tool_name: {"calls": count, "total_cost_usd": fee}}}`, rendering a dedicated `Agent | Tool | Calls | Tool Cost` table in the Rich Terminal Summary Box, logging `[FinOps Tools]` at turn end, and exporting `breakdown_by_tool` to **JSONL**, **CSV**, **HTTP**, **BigQuery**, **OpenTelemetry**, and the **Web Dashboard**.
+- **Google Search Grounding & Web Grounding**: Tools named `google_search`, `GoogleSearchTool`, `EnterpriseWebSearchTool`, or carrying `google_search` config attributes incur **\$0.014 / query** (\$14.00 per 1,000 queries; first 5,000 queries/month free) and log as `[FinOps Grounding]`.
+- **Google Maps Grounding**: Incurs **\$0.014 / query** (\$14.00 per 1,000 queries; first 5,000 queries/month free).
+- **Grounding with your data (Vertex AI Search / Datastores)**: Tools matching `vertex_search`, `vertex_ai_search`, `GroundingTool`, or carrying `vertex_ai_search` / `data_store_id` config attributes incur **\$0.0025 / prompt** (\$2.50 per 1,000 prompts) and log as `[FinOps Grounding]`.
+- **Free MCP, Database & Local Function Tools**: Un-decorated `McpToolset` / `MCPTool` endpoints, BigQuery toolsets, and local Python functions incur **\$0.00** tool fee.
 
 ---
 
@@ -813,6 +873,7 @@ FinOpsCostPlugin(
     default_model: str = "gemini-2.5-flash",
     rate_card_path: str | Path | None = None,
     rate_card: dict[str, Any] | None = None,
+    tool_rates: dict[str, float] | None = None,
     discount_percent: float | None = None,
     region: str | None = None,
     effective_date: str | date | None = None,
@@ -830,6 +891,7 @@ FinOpsCostPlugin(
 | :--- | :---: | :---: | :--- |
 | `default_model` | `str` | `"gemini-2.5-flash"` | Fallback model name if not reported by the LLM response. |
 | `rate_card_path` | `str \| Path` | `None` | Path to custom rate card JSON file. |
+| `tool_rates` | `dict[str, float]` | `None` | Custom per-call tool fees in USD (e.g. `{"bloomberg_mcp": 0.05}`). |
 | `discount_percent` | `float` | `None` | Enterprise volume discount percentage (e.g. `15.0` for 15%). |
 | `region` | `str \| None` | `None` | Pricing region override. When `None`, auto-detects from `GOOGLE_CLOUD_LOCATION` $\rightarrow$ `ADK_FINOPS_REGION` $\rightarrow$ `"global"`. |
 | `effective_date` | `str \| date` | `None` | Optional ISO date (`"YYYY-MM-DD"`) for date-tiered pricing (e.g. `"2027-01-01"` for 2027 standard rates). |
@@ -848,7 +910,7 @@ FinOpsCostPlugin(
 The bundled [`default_rates.json`](src/adk_finops/rates/default_rates.json) contains official public pricing (USD per 1M tokens, sourced from [Google Cloud Generative AI Pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing)):
 
 | Model | Provider | Input / 1M (`<=200k`) | Output / 1M (`<=200k`) | Cached / 1M (`<=200k`) | Context `>200k` (`_gt_200k`) / Regional (`non_global`) / 2027 Notes |
-| :--- | :---: | :---: | :---: | :---: | :---: |
+| :--- | :---: | :---: | :---: | :---: | :--- |
 | `gemini-3.1-pro-preview` | Google | \$2.00 | \$12.00 | \$0.20 | **`>200k`**: In \$4.00, Out \$18.00, Cached \$0.40 |
 | `gemini-3.8-flash-cyber` | Google | \$1.50 | \$7.50 | \$0.15 | **Non-global**: In \$1.65, Out \$8.25, Cached \$0.165 |
 | `gemini-3.8-flash` | Google | \$0.75 | \$3.75 | \$0.075 | **Non-global**: \$0.825 / \$4.125 • **2027 Standard**: \$1.50 / \$7.50 (Non-global: \$1.65 / \$8.25) |
@@ -907,6 +969,7 @@ When `bigquery_table` is specified, `adk-finops` automatically inspects and prov
 
 - **Partitioning**: Day-partitioned on `timestamp` to optimize query performance and reduce scan costs.
 - **Clustering**: Clustered by `[session_id, agent_name, model_name]` for sub-second filtering in Looker Studio and BI tools.
+- **Automatic Schema Evolution**: If the target BigQuery table already exists from an earlier version of `adk-finops`, `ensure_table_exists()` automatically adds any newly introduced `NULLABLE` columns (such as `breakdown_by_tool`) in-place with zero downtime.
 - **Non-Blocking Background Streaming**: Ingestion runs asynchronously in a background thread pool, adding **zero latency** to agent responses.
 
 #### Table Schema Reference
@@ -925,7 +988,7 @@ When `bigquery_table` is specified, `adk-finops` automatically inspects and prov
 | `cached_tokens` | `INTEGER` | Context cached token count |
 | `total_tokens` | `INTEGER` | Total billable tokens |
 | `llm_cost_usd` | `FLOAT` | Net LLM API cost in USD |
-| `tool_cost_usd` | `FLOAT` | Search & Grounding fees in USD |
+| `tool_cost_usd` | `FLOAT` | Search, Grounding & `@billable` tool fees in USD |
 | `total_cost_usd` | `FLOAT` | Total net cost in USD |
 | `gross_cost_usd` | `FLOAT` | Gross cost before caching discount |
 | `savings_usd` | `FLOAT` | Dollars saved via context caching |
@@ -936,6 +999,7 @@ When `bigquery_table` is specified, `adk-finops` automatically inspects and prov
 | `budget_exceeded` | `BOOLEAN` | Whether budget guard was tripped |
 | `breakdown_by_agent` | `JSON` | Multi-agent attribution snapshot |
 | `breakdown_by_model` | `JSON` | Model distribution snapshot |
+| `breakdown_by_tool` | `JSON` | Per-agent tool call counts & fee attribution (`{agent: {tool: {calls, total_cost_usd}}}`) |
 | `tags` | `JSON` | User-provided tags (e.g. `env`, `tenant_id`) |
 
 ---
@@ -1004,8 +1068,9 @@ Because both aggregate rows and attributed breakdown rows coexist in the same ta
   3. **`3. Session Filter (Scoped)`:** Automatically scopes the session dropdown so it **only lists sessions belonging to the selected Root Agent (and Sub-Agent)**.
   4. **`4. Model Filter`:** Scoped to the models invoked by the selected Root / Sub-Agent.
   5. **`5. Task Outcome`:** Filter between `✅ Effective Spend Only (Success)` and `🔥 Wasted Spend Only (Failed / Error / Budget)`.
-- **`👑 Root (Parent) Agent ➔ Sub-Agents Hierarchy Rollup` Explorer:** Interactive parent-to-child cards showing each Root Agent's overall parent rollup (`∑ Overall Parent Spend` and `Overall Parent Tokens`) alongside each child's spend, token breakdown (`In / Out / Think`), model, and **percentage share of parent spend** with click-to-filter support.
-- **5 Executive KPI Cards & 3 Interactive Charts:** Total Spend ($ with active scope badge), Effective Spend ($), Wasted Spend ($ & %), Context Caching Savings ($), Total Tokens (`In / Out / Think`), Spend Efficiency Doughnut, Sub-Agent Stacked Cost Bar (LLM vs Grounding), and Per-Model Token Composition.
+- **`👑 Root (Parent) Agent ➔ Sub-Agents Hierarchy Rollup` Explorer:** Interactive parent-to-child cards showing each Root Agent's overall parent rollup (`∑ Overall Parent Spend` and `Overall Parent Tokens`) alongside each child's spend, token breakdown (`In / Out / Think`), model, tool badges (`🔧 <tool> ×N ($cost)`), and **percentage share of parent spend** with click-to-filter support.
+- **`🔧 Tool Cost Attribution (Agent ➔ Tool ➔ #Calls ➔ Cost)` Panel & Live Telemetry Table:** Dedicated tool cost breakdown table showing `Agent | Tool | # Calls | Avg Cost / Call | Total Tool Cost` plus a `Tools (Calls / Fee)` column in the Live Telemetry Table.
+- **5 Executive KPI Cards & 3 Interactive Charts:** Total Spend ($ with active scope badge), Effective Spend ($), Wasted Spend ($ & %), Context Caching Savings ($), Total Tokens (`In / Out / Think`), Spend Efficiency Doughnut, Sub-Agent Stacked Cost Bar (LLM vs Tool/Grounding), and Per-Model Token Composition.
 
 ---
 
@@ -1092,7 +1157,7 @@ finops_plugin = FinOpsCostPlugin(
 )
 ```
 
-Each exported row in `.jsonl` and `.csv` automatically includes first-class task outcome columns (`status`, `is_failure`, `error`) alongside token counts, USD costs, context caching savings, and agent/model breakdowns.
+Each exported row in `.jsonl` and `.csv` automatically includes first-class task outcome columns (`status`, `is_failure`, `error`) alongside token counts, USD costs, context caching savings, and agent/model/tool breakdowns (`breakdown_by_agent`, `breakdown_by_model`, `breakdown_by_tool`).
 
 #### 2. Query Local `.jsonl` / `.csv` Logs Instantly with DuckDB or Pandas
 
@@ -1112,7 +1177,8 @@ GROUP BY 1, 2;
 
 When `enable_otel=True` (or `OpenTelemetryExporter` is used), `adk-finops` enriches the active span and emits `gen_ai.finops.<scope>` spans with standard attributes:
 - `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.thoughts_tokens`, `gen_ai.usage.cached_tokens`, `gen_ai.usage.total_tokens`
-- `gen_ai.usage.cost_usd`, `gen_ai.usage.llm_cost_usd`, `gen_ai.usage.tool_cost_usd`, `gen_ai.usage.savings_usd`
+- `gen_ai.usage.cost_usd`, `gen_ai.usage.llm_cost_usd`, `gen_ai.usage.tool_cost_usd`, `gen_ai.usage.savings_usd`, `gen_ai.usage.tool_calls_count`
+- `gen_ai.finops.breakdown_by_tool` (JSON-serialized `Agent -> Tool -> Calls & Cost` map)
 - `gen_ai.finops.task_outcome` (`success`, `failed`, `error`, `budget_exceeded`)
 - `gen_ai.finops.is_wasted_spend` (`true` / `false`)
 
@@ -1213,7 +1279,6 @@ ORDER BY total_spend_usd DESC;
 
 ## Limitations & Roadmap (Next Release)
 
-- **Explicit Tool Billing vs. String Matching**: Grounding fees currently rely on tool name matching(e.g., checking if the tool is named google_search, GoogleSearchTool, or vertex_search); upcoming versions would support explicit billing metadata/tags (e.g., `@billable(fee=...)`) and tool config inspection so custom-named tools are never missed.
 - **Pre-Flight Budget Guards**: Budget checks currently evaluate reactively after calls finish; future releases would add pre-flight token estimation to block massive requests before the network call occurs.
 
 ---

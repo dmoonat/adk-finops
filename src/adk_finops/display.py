@@ -90,6 +90,43 @@ def _resolve_optimization_insights(
     return list(insights or []), float(pot_usd or 0.0), float(pot_pct or 0.0)
 
 
+def _extract_tool_breakdown_rows(sess_info: dict[str, Any]) -> list[tuple[str, str, int, float]]:
+    """Extracts (agent_name, tool_name, calls, total_cost_usd) rows from session info."""
+    rows: list[tuple[str, str, int, float]] = []
+    tool_bd = sess_info.get("breakdown_by_tool")
+    if isinstance(tool_bd, dict) and tool_bd:
+        for a_name, t_map in tool_bd.items():
+            if isinstance(t_map, dict):
+                for t_name, t_data in t_map.items():
+                    if isinstance(t_data, dict):
+                        rows.append(
+                            (
+                                str(a_name),
+                                str(t_name),
+                                int(t_data.get("calls", 0)),
+                                float(t_data.get("total_cost_usd", 0.0)),
+                            )
+                        )
+    else:
+        agents = sess_info.get("breakdown_by_agent", {})
+        if isinstance(agents, dict):
+            for a_name, a_data in agents.items():
+                if isinstance(a_data, dict):
+                    t_map = a_data.get("tools", {})
+                    if isinstance(t_map, dict):
+                        for t_name, t_data in t_map.items():
+                            if isinstance(t_data, dict):
+                                rows.append(
+                                    (
+                                        str(a_name),
+                                        str(t_name),
+                                        int(t_data.get("calls", 0)),
+                                        float(t_data.get("total_cost_usd", 0.0)),
+                                    )
+                                )
+    return rows
+
+
 def render_rich_summary(
     summary: dict[str, Any],
     console: Console | None = None,
@@ -211,6 +248,24 @@ def render_rich_summary(
                 _format_usd(a_data.get("total_cost_usd", 0.0)),
             )
         render_items.append(agent_table)
+
+    # --- 4b. Tool Cost Breakdown Table (Agent -> Tool -> Calls -> Cost) ---
+    tool_rows = _extract_tool_breakdown_rows(sess_info)
+    if tool_rows:
+        tool_table = Table(box=SIMPLE, show_header=True, header_style="bold green", pad_edge=False)
+        tool_table.add_column("Agent", style="bold white", no_wrap=True)
+        tool_table.add_column("Tool", style="cyan", no_wrap=True)
+        tool_table.add_column("Calls", justify="right", no_wrap=True)
+        tool_table.add_column("Tool Cost", justify="right", style="bold yellow", no_wrap=True)
+
+        for a_name, t_name, t_calls, t_cost in tool_rows:
+            tool_table.add_row(
+                f"🤖 {a_name}",
+                f"🔧 {t_name}",
+                str(t_calls),
+                _format_usd(t_cost),
+            )
+        render_items.append(tool_table)
 
     # --- 5. Budget Status Footer ---
     if budget_info and budget_info.get("budget_limit_usd"):
@@ -431,6 +486,15 @@ def format_plain_summary_box(
             m_cost = _format_usd(m_data.get("total_cost_usd", 0.0))
             m_tok = _format_tokens(m_data.get("prompt_tokens", 0) + m_data.get("completion_tokens", 0) + m_data.get("thoughts_tokens", 0))
             line_content = f"   • {m_name}: {m_cost} ({m_tok} tokens, {m_data.get('calls', 0)} calls)"
+            lines.append(f"│  {line_content:<72}│")
+
+    # Tools
+    tool_rows = _extract_tool_breakdown_rows(sess_info)
+    if tool_rows:
+        lines.append("├" + "─" * (width - 2) + "┤")
+        lines.append(f"│  {'Tools Breakdown (Agent -> Tool -> Calls -> Cost):':<72}│")
+        for a_name, t_name, t_calls, t_cost in tool_rows:
+            line_content = f"   • {a_name} -> {t_name}: {t_calls} call(s) ({_format_usd(t_cost)})"
             lines.append(f"│  {line_content:<72}│")
 
     # Automated FinOps Optimization Advisor

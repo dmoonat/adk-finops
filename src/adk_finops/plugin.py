@@ -81,6 +81,7 @@ class FinOpsCostPlugin(BasePlugin):
         exporters: list[Any] | None = None,
         export_scope: str | None = None,
         export_tags: dict[str, Any] | None = None,
+        tool_rates: dict[str, float] | None = None,
     ):
         super().__init__(name=name)
         try:
@@ -97,6 +98,12 @@ class FinOpsCostPlugin(BasePlugin):
         self.on_budget_exceeded = on_budget_exceeded.lower()
         self.fallback_model = fallback_model
         self.render_terminal_box = render_terminal_box
+        self.tool_rates: dict[str, float] = {}
+        if tool_rates:
+            for t_name, t_fee in tool_rates.items():
+                clean_t = t_name.strip().lower()
+                self.tool_rates[clean_t] = float(t_fee)
+                CostTracker.register_tool_rate(clean_t, float(t_fee))
         env_advisor = os.getenv("ADK_FINOPS_OPTIMIZATION_ADVISOR", "").strip().lower()
         if env_advisor in ("0", "false", "no", "off"):
             self.enable_optimization_advisor = False
@@ -452,28 +459,57 @@ class FinOpsCostPlugin(BasePlugin):
         tool_context: ToolContext,
         result: dict,
     ) -> dict | None:
-        """Intercepts tool executions to record Search and Grounding fees for turn and session."""
+        """Intercepts tool executions to record explicit @billable, Search, and Grounding fees for turn and session."""
+        from .billable import extract_billable_spec, is_error_tool_result
+
         turn_id, session_id = self._extract_ids(tool_context)
         agent_name = self._extract_agent_name(tool_context)
-        tool_name = getattr(tool, "name", "tool")
+        tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "tool")
         clean_name = tool_name.strip().lower()
         tool_class_name = tool.__class__.__name__.lower()
         tool_module = getattr(tool.__class__, "__module__", "").lower()
 
-        # 1. Check if tool is explicitly registered with a custom fee in CostTracker
-        tool_type = None
-        if clean_name in CostTracker.get_registry().registered_tools:
+        custom_cost_usd: float | None = None
+        provider: str | None = None
+        tool_type: str | None = None
+
+        # 1. Inspect explicit @billable decorator or ADK tool custom_metadata
+        billable_spec = extract_billable_spec(tool)
+        if billable_spec is not None:
+            computed_fee = billable_spec.compute_fee(tool_args=tool_args, result=result)
+            if computed_fee <= 0.0:
+                return None
+            tool_type = (billable_spec.tool_name or clean_name).strip().lower()
+            custom_cost_usd = computed_fee
+            provider = billable_spec.provider
+        # 2. Check plugin-level tool_rates (overrides MCP skip so paid MCP tools in tool_rates are billed)
+        elif clean_name in self.tool_rates:
+            if is_error_tool_result(result):
+                return None
             tool_type = clean_name
-        # 2. Skip MCP tools, local function tools, and database tools
+            custom_cost_usd = self.tool_rates[clean_name]
+        # 3. Check if tool is explicitly registered with a custom fee in CostTracker
+        elif clean_name in CostTracker.get_registry().registered_tools:
+            if is_error_tool_result(result):
+                return None
+            tool_type = clean_name
+        # 4. Skip un-decorated MCP tools, local function tools, and database tools
         elif "mcp" in tool_module or "mcp" in tool_class_name:
             return None
-        # 3. Check for actual Google Search Grounding tools
-        elif "google_search" in clean_name or "googlesearch" in tool_class_name:
+        # 5. Check for Google Search / Web Grounding tools (by name, class, or ADK grounding config attributes)
+        elif (
+            "google_search" in clean_name
+            or "googlesearch" in tool_class_name
+            or "enterprisewebsearch" in tool_class_name
+            or hasattr(tool, "google_search")
+        ):
             tool_type = "vertex_grounding_google_search"
-        # 4. Check for actual Vertex AI Search / Datastore Grounding tools
+        # 6. Check for Vertex AI Search / Datastore Grounding tools
         elif (
             any(k in clean_name for k in ("vertex_search", "vertex_ai_search", "vertex_grounding"))
             or any(k in tool_class_name for k in ("vertexsearch", "vertexaisearch", "groundingtool"))
+            or hasattr(tool, "vertex_ai_search")
+            or hasattr(tool, "data_store_id")
         ):
             tool_type = "vertex_grounding_private"
 
@@ -484,7 +520,9 @@ class FinOpsCostPlugin(BasePlugin):
                 tool_name=tool_type,
                 count=1,
                 task_name=tool_name,
+                custom_cost_usd=custom_cost_usd,
                 agent_name=agent_name,
+                provider=provider,
             )
             try:
                 from opentelemetry import trace
@@ -495,7 +533,12 @@ class FinOpsCostPlugin(BasePlugin):
                     current_span.set_attribute("gen_ai.finops.tool_fee_usd", float(cost))
             except Exception:
                 pass
-            msg = f"[FinOps Grounding] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}"
+            is_grounding = tool_type in (
+                "vertex_grounding_google_search",
+                "vertex_grounding_private",
+            )
+            log_prefix = "[FinOps Grounding]" if is_grounding else "[FinOps Tool]"
+            msg = f"{log_prefix} turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}"
             print(msg, flush=True)
             logger.info(msg)
 
@@ -596,6 +639,20 @@ class FinOpsCostPlugin(BasePlugin):
                 agents_msg = f"[FinOps Agents] " + " | ".join(agent_parts)
                 print(agents_msg, flush=True)
                 logger.info(agents_msg)
+
+            tool_breakdown = sess_info.get("breakdown_by_tool", {})
+            if tool_breakdown:
+                tool_parts = [
+                    f"{a_name} -> {t_name}: {t_data.get('calls', 0)} call(s) (${t_data.get('total_cost_usd', 0.0):.4f})"
+                    for a_name, t_map in tool_breakdown.items()
+                    if isinstance(t_map, dict)
+                    for t_name, t_data in t_map.items()
+                    if isinstance(t_data, dict)
+                ]
+                if tool_parts:
+                    tools_msg = "[FinOps Tools] " + " | ".join(tool_parts)
+                    print(tools_msg, flush=True)
+                    logger.info(tools_msg)
 
             if self.render_terminal_box:
                 from .display import print_summary

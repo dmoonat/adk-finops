@@ -572,3 +572,5 @@ class RateCardRegistry:
     def registered_tools(self) -> list[str]:
         with self._lock:
             return list(self._tools.keys())
+
+

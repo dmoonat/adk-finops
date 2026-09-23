@@ -108,6 +108,9 @@ def test_row_serialization_and_attribution():
     assert agg_row["savings_usd"] > 0
     assert json.loads(agg_row["tags"]) == {"env": "test", "tenant": "corp-1"}
     assert "researcher" in json.loads(agg_row["breakdown_by_agent"])
+    agg_tools = json.loads(agg_row["breakdown_by_tool"])
+    assert agg_tools["researcher"]["google_search"]["calls"] == 1
+    assert agg_tools["researcher"]["google_search"]["total_cost_usd"] > 0
 
     # 2. Agent row
     agent_row = rows[1]
@@ -115,6 +118,9 @@ def test_row_serialization_and_attribution():
     assert agent_row["agent_name"] == "researcher"
     assert agent_row["total_tokens"] == 10500
     assert agent_row["tool_calls_count"] == 1
+    agent_tools = json.loads(agent_row["breakdown_by_tool"])
+    assert agent_tools["researcher"]["google_search"]["calls"] == 1
+    assert agent_tools["researcher"]["google_search"]["total_cost_usd"] > 0
 
 
 def test_scope_both_exports_turn_and_session_rows():

@@ -65,6 +65,7 @@ CSV_FIELDNAMES = [
     "budget_exceeded",
     "breakdown_by_agent",
     "breakdown_by_model",
+    "breakdown_by_tool",
     "tags",
 ]
 
