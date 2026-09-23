@@ -50,12 +50,12 @@ jobs:
 
       - name: Install build & test dependencies
         run: |
-          python -m pip install --upgrade pip build twine pytest pytest-asyncio
-          pip install -e ".[rich]"
+          python -m pip install --upgrade pip build twine
+          pip install -e ".[dev]"
 
       - name: Run complete unit & security test suite (all 13 test modules)
         run: |
-          pytest tests/ -q
+          pytest -o asyncio_mode=auto tests/ -q
           python tests/run_all_tests.py
 
       - name: Resolve or auto-bump package version
