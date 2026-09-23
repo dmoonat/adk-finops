@@ -283,7 +283,7 @@ def test_pricing_extractor_merges_and_preserves_curated_fields(monkeypatch) -> N
                     "output_per_1m": 10.00,
                     "cached_input_per_1m": 1.25,
                 },
-                "gpt-4.1": {
+                "gpt-99-ultra-test": {
                     "provider": "openai",
                     "input_per_1m": 2.00,
                     "output_per_1m": 8.00,
@@ -300,7 +300,7 @@ def test_pricing_extractor_merges_and_preserves_curated_fields(monkeypatch) -> N
     )
 
     report = extractor.build_merged_rate_card()
-    assert "gpt-4.1" in report.added_models
+    assert "gpt-99-ultra-test" in report.added_models
     assert len(report.merged_rate_card["source_urls"]) == 2
     source_names = [s["name"] for s in report.merged_rate_card["sources"]]
     assert source_names == ["gemini_enterprise_pricing", "litellm_registry"]
