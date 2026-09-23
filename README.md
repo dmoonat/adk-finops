@@ -1215,7 +1215,6 @@ ORDER BY total_spend_usd DESC;
 
 - **Explicit Tool Billing vs. String Matching**: Grounding fees currently rely on tool name matching(e.g., checking if the tool is named google_search, GoogleSearchTool, or vertex_search); upcoming versions would support explicit billing metadata/tags (e.g., `@billable(fee=...)`) and tool config inspection so custom-named tools are never missed.
 - **Pre-Flight Budget Guards**: Budget checks currently evaluate reactively after calls finish; future releases would add pre-flight token estimation to block massive requests before the network call occurs.
-- **Dynamic Remote Rate Card Syncing**: Pricing currently defaults to a bundled static JSON file; future iterations would support automated background syncing from centralized cloud pricing endpoints with offline fallback.
 
 ---
 

@@ -1,0 +1,147 @@
+name: Build & Release to PyPI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "examples/**"
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Version bump type if current pyproject.toml version is already tagged"
+        required: false
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  id-token: write  # Enables PyPI Trusted Publishing (OIDC)
+
+concurrency:
+  group: pypi-release-main
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    # Guard against running on automated release commits pushed by github-actions[bot]
+    if: >-
+      github.event_name != 'push' ||
+      (!startsWith(github.event.head_commit.message, 'chore(release):') &&
+       !contains(github.event.head_commit.message, '[skip ci]'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build & test dependencies
+        run: |
+          python -m pip install --upgrade pip build twine pytest
+          pip install -e ".[rich]"
+
+      - name: Run rate card & pricing unit tests
+        run: |
+          pytest tests/test_rate_card.py -q
+
+      - name: Resolve or auto-bump package version
+        id: version
+        env:
+          BUMP_TYPE: ${{ inputs.bump_type || 'patch' }}
+        run: |
+          python -c '
+          import os, pathlib, re, subprocess
+
+          pyproject = pathlib.Path("pyproject.toml")
+          ver_file = pathlib.Path("src/adk_finops/_version.py")
+          text = pyproject.read_text(encoding="utf-8")
+          m = re.search(r"^version\s*=\s*\"(\d+)\.(\d+)\.(\d+)\"", text, re.M)
+          major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+          cur_ver = f"{major}.{minor}.{patch}"
+
+          # Check if tag v{cur_ver} already exists in git
+          existing_tags = subprocess.check_output(["git", "tag", "-l", f"v{cur_ver}"], text=True).strip()
+          if existing_tags:
+              bump = os.environ.get("BUMP_TYPE", "patch")
+              if bump == "major":
+                  major, minor, patch = major + 1, 0, 0
+              elif bump == "minor":
+                  minor, patch = minor + 1, 0
+              else:
+                  patch += 1
+              target_ver = f"{major}.{minor}.{patch}"
+              pyproject.write_text(
+                  re.sub(r"^version\s*=\s*\"[^\"]+\"", f"version = \"{target_ver}\"", text, count=1, flags=re.M),
+                  encoding="utf-8",
+              )
+              vtext = ver_file.read_text(encoding="utf-8")
+              ver_file.write_text(
+                  re.sub(r"__version__\s*=\s*\"[^\"]+\"", f"__version__ = \"{target_ver}\"", vtext),
+                  encoding="utf-8",
+              )
+              bumped = "true"
+          else:
+              # Developer already updated version in pyproject.toml before merging to main
+              target_ver = cur_ver
+              vtext = ver_file.read_text(encoding="utf-8")
+              if f"\"{target_ver}\"" not in vtext:
+                  ver_file.write_text(
+                      re.sub(r"__version__\s*=\s*\"[^\"]+\"", f"__version__ = \"{target_ver}\"", vtext),
+                      encoding="utf-8",
+                  )
+                  bumped = "true"
+              else:
+                  bumped = "false"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"version={target_ver}\n")
+              out.write(f"tag=v{target_ver}\n")
+              out.write(f"bumped={bumped}\n")
+          print(f"Target release version: v{target_ver} (auto-bumped={bumped})")
+          '
+
+      - name: Commit version bump and push Git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "${{ steps.version.outputs.bumped }}" = "true" ]; then
+            git add pyproject.toml src/adk_finops/_version.py
+            git commit -m "chore(release): ${{ steps.version.outputs.tag }} [skip ci]"
+            git push origin HEAD:main
+          fi
+          git tag -f "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Build sdist and wheel package
+        run: |
+          rm -rf dist/
+          python -m build
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          gh release create "$TAG" dist/* \
+            --title "$TAG" \
+            --generate-notes \
+            --latest

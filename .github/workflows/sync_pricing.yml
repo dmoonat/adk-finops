@@ -14,11 +14,17 @@ on:
 
 permissions:
   contents: write
-  id-token: write  # Enables PyPI Trusted Publishing (OIDC)
+  id-token: write  # Passed through to release.yml for PyPI Trusted Publishing
+
+concurrency:
+  group: pypi-release-main
+  cancel-in-progress: false
 
 jobs:
-  sync-and-release:
+  sync-rate-card:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check_changes.outputs.changed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,9 +36,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build & package dependencies
+      - name: Install package dependencies
         run: |
-          python -m pip install --upgrade pip build twine
+          python -m pip install --upgrade pip
           pip install -e ".[rich]"
 
       - name: Run Google Cloud & Multi-Provider Pricing Extraction Framework
@@ -45,7 +51,7 @@ jobs:
           fi
           python -m adk_finops.pricing_extractor --update-default $EXTRA_FLAGS
 
-      - name: Check for pricing changes & bump patch version
+      - name: Commit and push updated default_rates.json if changed
         id: check_changes
         run: |
           if git diff --quiet src/adk_finops/rates/default_rates.json; then
@@ -53,55 +59,17 @@ jobs:
             echo "No pricing changes detected in default_rates.json. Skipping release."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            NEW_VERSION=$(python -c '
-          import pathlib, re
-          pyproject = pathlib.Path("pyproject.toml")
-          text = pyproject.read_text(encoding="utf-8")
-          m = re.search(r"^version\s*=\s*\"(\d+)\.(\d+)\.(\d+)\"", text, re.M)
-          major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3)) + 1
-          new_ver = f"{major}.{minor}.{patch}"
-          pyproject.write_text(re.sub(r"^version\s*=\s*\"[^\"]+\"", f"version = \"{new_ver}\"", text, count=1, flags=re.M), encoding="utf-8")
-          ver_file = pathlib.Path("src/adk_finops/_version.py")
-          vtext = ver_file.read_text(encoding="utf-8")
-          ver_file.write_text(re.sub(r"__version__\s*=\s*\"[^\"]+\"", f"__version__ = \"{new_ver}\"", vtext), encoding="utf-8")
-          print(new_ver)
-          ')
-            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-            echo "Bumped adk-finops version to $NEW_VERSION"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/adk_finops/rates/default_rates.json
+            git commit -m "chore(rates): auto-sync Google Cloud & multi-provider pricing [skip ci]"
+            git push origin HEAD:main
           fi
 
-      - name: Commit, tag, and push updated rate card & version
-        if: steps.check_changes.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/adk_finops/rates/default_rates.json pyproject.toml src/adk_finops/_version.py
-          git commit -m "chore(release): v${{ steps.check_changes.outputs.new_version }} — auto-sync LLM pricing rate card"
-          git tag "v${{ steps.check_changes.outputs.new_version }}"
-          git push origin HEAD --tags
+  trigger-release:
+    needs: sync-rate-card
+    if: needs.sync-rate-card.outputs.changed == 'true'
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
 
-      - name: Build sdist and wheel package
-        if: steps.check_changes.outputs.changed == 'true'
-        run: |
-          rm -rf dist/
-          python -m build
-
-      - name: Publish package to PyPI
-        if: steps.check_changes.outputs.changed == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          skip-existing: true
-
-      - name: Create GitHub Release
-        if: steps.check_changes.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v${{ steps.check_changes.outputs.new_version }}"
-          gh release create "$TAG" dist/* \
-            --title "$TAG — Automated LLM Pricing Rate Card Sync" \
-            --notes "Automated synchronization of Google Cloud Gemini Enterprise & multi-provider pricing in \`default_rates.json\`." \
-            --generate-notes \
-            --latest
 
