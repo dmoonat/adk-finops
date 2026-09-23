@@ -39,15 +39,35 @@ import threading
 import time
 from typing import Any
 
+from collections import OrderedDict
+import hmac
+
+from .exporters.bigquery import validate_bq_table_id
 from .tracker import CostTracker
 
 logger = logging.getLogger("adk_finops.dashboard")
 
 _BQ_CACHE: dict[str, Any] = {"timestamp": 0.0, "rows": [], "error": None}
 _BQ_CACHE_TTL_SEC = 15.0
-_INGESTED_ROWS: dict[tuple[Any, ...], dict[str, Any]] = {}
+MAX_INGESTED_ROWS = 5_000
+MAX_INGEST_BATCH_ROWS = 250
+_INGESTED_ROWS: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+_INGESTED_ROWS_LOCK = threading.Lock()
 _DASHBOARD_THREAD: threading.Thread | None = None
 _DASHBOARD_URL: str | None = None
+
+
+def ingest_row_in_memory(raw: dict[str, Any], source: str = "http_ingest") -> dict[str, Any]:
+    """Thread-safely normalizes and inserts a row into _INGESTED_ROWS with LRU eviction."""
+    row = _normalize_row(raw, source=source)
+    key = (row["session_id"], row["scope"], row["agent_name"] or "__ALL__")
+    with _INGESTED_ROWS_LOCK:
+        if key in _INGESTED_ROWS:
+            _INGESTED_ROWS.move_to_end(key)
+        _INGESTED_ROWS[key] = row
+        while len(_INGESTED_ROWS) > MAX_INGESTED_ROWS:
+            _INGESTED_ROWS.popitem(last=False)
+    return row
 
 
 def _normalize_row(raw: dict[str, Any], source: str = "local") -> dict[str, Any]:
@@ -285,12 +305,6 @@ def collect_telemetry_rows(
     deduped: dict[tuple[Any, ...], dict[str, Any]] = {}
     sources_found: list[str] = []
 
-    # 0. Include any rows pushed via POST /api/ingest from remote org agents
-    if _INGESTED_ROWS:
-        for k, v in _INGESTED_ROWS.items():
-            deduped[k] = dict(v)
-        sources_found.append("http_ingest")
-
     # 1. Read local JSONL and CSV files across one or more comma-separated log_dir paths
     log_dirs = [p.strip() for p in str(log_dir).split(",") if p.strip()] if log_dir else []
     for d_str in log_dirs:
@@ -301,10 +315,11 @@ def collect_telemetry_rows(
 
             for jf in jsonl_files:
                 try:
+                    src_label = "http_ingest" if jf.name == "ingested_costs.jsonl" else f"jsonl:{jf.parent.name}/{jf.name}"
                     for line in jf.read_text(encoding="utf-8").splitlines():
                         if not line.strip():
                             continue
-                        row = _normalize_row(json.loads(line), source=f"jsonl:{jf.parent.name}/{jf.name}")
+                        row = _normalize_row(json.loads(line), source=src_label)
                         key = (row["session_id"], row["scope"], row["agent_name"] or "__ALL__")
                         deduped[key] = row
                     if "local_jsonl" not in sources_found:
@@ -324,6 +339,14 @@ def collect_telemetry_rows(
                         sources_found.append("local_csv")
                 except Exception as e:
                     logger.debug(f"[FinOps Dashboard] Could not read {cf}: {e}")
+
+    # 1b. Overlay any live rows pushed via POST /api/ingest in memory so source="http_ingest" is preserved
+    if _INGESTED_ROWS:
+        with _INGESTED_ROWS_LOCK:
+            for k, v in _INGESTED_ROWS.items():
+                deduped[k] = dict(v)
+        if "http_ingest" not in sources_found:
+            sources_found.append("http_ingest")
 
     # 2. Read live in-memory CostTracker sessions (real-time mid-run state)
     try:
@@ -389,7 +412,8 @@ def collect_telemetry_rows(
             try:
                 from google.cloud import bigquery
 
-                parts = resolved_bq.split(".")
+                safe_bq = validate_bq_table_id(resolved_bq)
+                parts = safe_bq.split(".")
                 client = bigquery.Client(project=parts[0] if len(parts) == 3 else None)
                 query = f"""
                 SELECT
@@ -422,7 +446,7 @@ def collect_telemetry_rows(
                   breakdown_by_agent,
                   breakdown_by_tool,
                   tags
-                FROM `{resolved_bq}`
+                FROM `{safe_bq}`
                 ORDER BY timestamp DESC
                 LIMIT 300
                 """
@@ -670,6 +694,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       let isPaused = false;
       let effChart = null, agentChart = null, modelChart = null;
 
+      function escapeHtml(val) {
+        if (val === null || val === undefined) return '';
+        return String(val)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
       function togglePause() {
         isPaused = !isPaused;
         document.getElementById('pauseBtn').innerText = isPaused ? '▶ Resume Auto-Refresh' : '⏸ Pause Auto-Refresh';
@@ -775,6 +809,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         renderDashboard();
       }
 
+      function selectHierarchyFromEl(el) {
+        const rootName = el.getAttribute('data-root') || 'ALL';
+        const subName = el.getAttribute('data-sub') || 'ALL';
+        selectHierarchyTarget(rootName, subName);
+      }
+
       function resetHierarchyFilter() {
         document.getElementById('rootAgentFilter').value = 'ALL';
         document.getElementById('subAgentFilter').value = 'ALL';
@@ -786,8 +826,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       function syncSelect(id, allLabel, items) {
         const sel = document.getElementById(id);
         const cur = sel.value;
-        sel.innerHTML = `<option value="ALL">${allLabel}</option>` +
-          items.map(x => `<option value="${x.value}">${x.label}</option>`).join('');
+        sel.innerHTML = `<option value="ALL">${escapeHtml(allLabel)}</option>` +
+          items.map(x => `<option value="${escapeHtml(x.value)}">${escapeHtml(x.label)}</option>`).join('');
         if (items.some(x => x.value === cur)) {
           sel.value = cur;
         } else {
@@ -990,19 +1030,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               : 'border-gray-800 bg-gray-900/70 hover:border-gray-600';
             const barColor = c.isRootSelf ? 'bg-indigo-500' : 'bg-cyan-500';
             const toolPills = Object.entries(c.tools || {}).map(([tName, tStats]) =>
-              `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/70 text-[10px] font-mono">🔧 ${tName} ×${tStats.calls} ($${tStats.cost.toFixed(4)})</span>`
+              `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/70 text-[10px] font-mono">🔧 ${escapeHtml(tName)} ×${Number(tStats.calls || 0)} ($${Number(tStats.cost || 0).toFixed(4)})</span>`
             ).join(' ');
+            const modelsDisplay = escapeHtml([...c.models].join(', ') || 'default');
             return `
-              <div onclick="selectHierarchyTarget('${rName}', '${c.name}')" class="cursor-pointer rounded-lg border p-3 transition ${borderCls}">
+              <div data-root="${escapeHtml(rName)}" data-sub="${escapeHtml(c.name)}" onclick="selectHierarchyFromEl(this)" class="cursor-pointer rounded-lg border p-3 transition ${borderCls}">
                 <div class="flex items-center justify-between gap-2 mb-1">
                   <div class="flex items-center gap-1.5 truncate">
                     ${roleBadge}
-                    <span class="text-xs font-semibold text-white truncate">${c.name}</span>
+                    <span class="text-xs font-semibold text-white truncate">${escapeHtml(c.name)}</span>
                   </div>
                   <span class="text-xs font-bold text-white font-mono">$${c.cost.toFixed(5)}</span>
                 </div>
                 <div class="flex items-center justify-between text-[11px] text-gray-400 mb-1">
-                  <span class="truncate">Model: <span class="text-gray-300 font-mono">${[...c.models].join(', ') || 'default'}</span></span>
+                  <span class="truncate">Model: <span class="text-gray-300 font-mono">${modelsDisplay}</span></span>
                   <span class="text-cyan-300 font-mono">${sharePct}% of parent</span>
                 </div>
                 <div class="text-[10px] text-gray-400 font-mono flex justify-between mb-1.5">
@@ -1029,7 +1070,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                   <span class="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-950 text-amber-300 border border-amber-700/80">
                     ∑ PARENT LEVEL ROLLUP
                   </span>
-                  <span class="text-sm font-bold text-white font-mono">👑 ${rName}</span>
+                  <span class="text-sm font-bold text-white font-mono">👑 ${escapeHtml(rName)}</span>
                   <span class="text-xs text-gray-400">
                     (${subCount} Sub-Agent${subCount === 1 ? '' : 's'} • ${info.sessions.size} Session${info.sessions.size === 1 ? '' : 's'})
                   </span>
@@ -1043,7 +1084,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <div class="text-[10px] uppercase tracking-wider text-gray-400">Overall Parent Tokens</div>
                     <div class="text-sm font-bold text-indigo-300 font-mono">${parentTotalTokens.toLocaleString()}</div>
                   </div>
-                  <button onclick="selectHierarchyTarget('${rName}', 'ALL')" class="text-xs px-3 py-1.5 rounded-lg font-medium ${isSelectedRoot ? 'bg-indigo-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-indigo-300 border border-gray-700'}">
+                  <button data-root="${escapeHtml(rName)}" data-sub="ALL" onclick="selectHierarchyFromEl(this)" class="text-xs px-3 py-1.5 rounded-lg font-medium ${isSelectedRoot ? 'bg-indigo-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-indigo-300 border border-gray-700'}">
                     ${isSelectedRoot ? '✓ Viewing Parent Rollup' : 'Filter Root & Show Sub-Agents'}
                   </button>
                 </div>
@@ -1090,9 +1131,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         tbody.innerHTML = entries.map(item => {
           const avg = item.calls > 0 ? item.cost / item.calls : 0;
           return `<tr class="hover:bg-gray-900/50">
-            <td class="py-2 px-4 text-cyan-300 font-semibold">🤖 ${item.agent}</td>
-            <td class="py-2 px-4 text-emerald-300">🔧 ${item.tool}</td>
-            <td class="py-2 px-4 text-right text-gray-200">${item.calls}</td>
+            <td class="py-2 px-4 text-cyan-300 font-semibold">🤖 ${escapeHtml(item.agent)}</td>
+            <td class="py-2 px-4 text-emerald-300">🔧 ${escapeHtml(item.tool)}</td>
+            <td class="py-2 px-4 text-right text-gray-200">${Number(item.calls || 0)}</td>
             <td class="py-2 px-4 text-right text-gray-400">$${avg.toFixed(4)}</td>
             <td class="py-2 px-4 text-right font-bold text-amber-300">$${item.cost.toFixed(4)}</td>
           </tr>`;
@@ -1175,35 +1216,41 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           const badgeClass = r.is_failure
             ? 'bg-rose-950 text-rose-400 border-rose-800'
             : 'bg-emerald-950 text-emerald-400 border-emerald-800';
-          const outcomeLabel = (r.status || 'success').toUpperCase();
-          const ts = (r.timestamp || '').replace('T', ' ').slice(0, 19);
-          const rootLabel = `<span class="text-indigo-300 font-semibold">👑 ${r.root_agent_name || 'root_agent'}</span>`;
+          const outcomeLabel = escapeHtml((r.status || 'success').toUpperCase());
+          const ts = escapeHtml((r.timestamp || '').replace('T', ' ').slice(0, 19));
+          const safeRoot = escapeHtml(r.root_agent_name || 'root_agent');
+          const safeAgent = escapeHtml(r.agent_name || '');
+          const rootLabel = `<span class="text-indigo-300 font-semibold">👑 ${safeRoot}</span>`;
           let agentRoleCell = '';
           if (!r.agent_name) {
-            agentRoleCell = `<span class="px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/80 text-[11px] font-bold">∑ OVERALL PARENT TOTAL (${r.root_agent_name || 'root'})</span>`;
+            agentRoleCell = `<span class="px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/80 text-[11px] font-bold">∑ OVERALL PARENT TOTAL (${safeRoot})</span>`;
           } else if (r.agent_name === r.root_agent_name) {
-            agentRoleCell = `<span class="text-indigo-200 font-semibold">👑 ${r.agent_name} <span class="text-[10px] text-indigo-400">[ROOT DIRECT]</span></span>`;
+            agentRoleCell = `<span class="text-indigo-200 font-semibold">👑 ${safeAgent} <span class="text-[10px] text-indigo-400">[ROOT DIRECT]</span></span>`;
           } else {
-            agentRoleCell = `<span class="text-cyan-300">↳ 🤖 ${r.agent_name} <span class="text-[10px] text-gray-400">[SUB-AGENT]</span></span>`;
+            agentRoleCell = `<span class="text-cyan-300">↳ 🤖 ${safeAgent} <span class="text-[10px] text-gray-400">[SUB-AGENT]</span></span>`;
           }
-          const tCalls = r.tool_calls_count || 0;
-          const tCost = r.tool_cost_usd || 0;
+          const tCalls = Number(r.tool_calls_count || 0);
+          const tCost = Number(r.tool_cost_usd || 0);
           const toolCell = tCalls > 0
             ? `<span class="text-emerald-300">${tCalls} call${tCalls === 1 ? '' : 's'} ($${tCost.toFixed(4)})</span>`
             : `<span class="text-gray-600">—</span>`;
+          const safeTitle = escapeHtml(r.error || r.source || '');
+          const safeSourceOrErr = r.error
+            ? `<span class="text-rose-400">⚠️ ${escapeHtml(r.error)}</span>`
+            : escapeHtml(r.source || '');
           return `<tr class="hover:bg-gray-900/50 ${!r.agent_name ? 'bg-amber-950/10' : ''}">
             <td class="py-2 px-3 text-gray-400">${ts}</td>
-            <td class="py-2 px-3 text-indigo-300 font-medium">${r.session_id}</td>
+            <td class="py-2 px-3 text-indigo-300 font-medium">${escapeHtml(r.session_id)}</td>
             <td class="py-2 px-3">${rootLabel}</td>
             <td class="py-2 px-3">${agentRoleCell}</td>
-            <td class="py-2 px-3 text-gray-300">${r.model_name || 'ALL'}</td>
+            <td class="py-2 px-3 text-gray-300">${escapeHtml(r.model_name || 'ALL')}</td>
             <td class="py-2 px-3"><span class="px-2 py-0.5 rounded border text-[10px] font-semibold ${badgeClass}">${outcomeLabel}</span></td>
-            <td class="py-2 px-3 text-right text-gray-300">${(r.total_tokens||0).toLocaleString()} <span class="text-gray-500">(${r.prompt_tokens}/${r.completion_tokens}/${r.thoughts_tokens})</span></td>
-            <td class="py-2 px-3 text-right text-amber-400">${(r.cached_tokens||0).toLocaleString()}</td>
+            <td class="py-2 px-3 text-right text-gray-300">${Number(r.total_tokens||0).toLocaleString()} <span class="text-gray-500">(${Number(r.prompt_tokens||0)}/${Number(r.completion_tokens||0)}/${Number(r.thoughts_tokens||0)})</span></td>
+            <td class="py-2 px-3 text-right text-amber-400">${Number(r.cached_tokens||0).toLocaleString()}</td>
             <td class="py-2 px-3 text-right">${toolCell}</td>
-            <td class="py-2 px-3 text-right font-semibold text-white">$${(r.total_cost_usd||0).toFixed(6)}</td>
-            <td class="py-2 px-3 text-right text-emerald-400">${r.savings_usd > 0 ? '$' + r.savings_usd.toFixed(6) : '—'}</td>
-            <td class="py-2 px-3 text-gray-400 truncate max-w-xs" title="${r.error || r.source}">${r.error ? '<span class="text-rose-400">⚠️ ' + r.error + '</span>' : r.source}</td>
+            <td class="py-2 px-3 text-right font-semibold text-white">$${Number(r.total_cost_usd||0).toFixed(6)}</td>
+            <td class="py-2 px-3 text-right text-emerald-400">${r.savings_usd > 0 ? '$' + Number(r.savings_usd).toFixed(6) : '—'}</td>
+            <td class="py-2 px-3 text-gray-400 truncate max-w-xs" title="${safeTitle}">${safeSourceOrErr}</td>
           </tr>`;
         }).join('');
       }
@@ -1219,12 +1266,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 def create_dashboard_app(
     log_dir: str | Path = "logs",
     bigquery_table: str | None = None,
+    api_key: str | None = None,
 ) -> Any:
     """Creates a FastAPI application serving the near-live FinOps dashboard."""
-    from fastapi import FastAPI
+    from fastapi import FastAPI, HTTPException, Request
     from fastapi.responses import HTMLResponse, JSONResponse
 
-    app = FastAPI(title="ADK FinOps Live Tracker", version="0.4.0")
+    globals()["Request"] = Request
+
+    app = FastAPI(title="ADK FinOps Live Tracker", version="0.8.0")
+    configured_api_key = (api_key or os.environ.get("ADK_FINOPS_DASHBOARD_API_KEY") or "").strip()
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
@@ -1239,17 +1290,40 @@ def create_dashboard_app(
         )
 
     @app.post("/api/ingest", response_class=JSONResponse)
-    async def api_ingest(payload: dict[str, Any]) -> dict[str, Any]:
+    async def api_ingest(request: Request) -> dict[str, Any]:
         """Allows remote agents across an organization to push telemetry rows directly to a central dashboard."""
-        rows_in = payload.get("rows", [payload] if "session_id" in payload else [])
+        if configured_api_key:
+            provided_key = (
+                request.headers.get("X-FinOps-Key")
+                or request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+                or ""
+            ).strip()
+            if not provided_key or not hmac.compare_digest(provided_key, configured_api_key):
+                raise HTTPException(status_code=401, detail="Invalid or missing X-FinOps-Key / Bearer token.")
+
+        try:
+            payload = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON payload must be an object.")
+
+        raw_rows_in = payload.get("rows", [payload] if "session_id" in payload else [])
+        if not isinstance(raw_rows_in, list):
+            raise HTTPException(status_code=400, detail="'rows' must be a list of telemetry dictionaries.")
+        if len(raw_rows_in) > MAX_INGEST_BATCH_ROWS:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Batch size {len(raw_rows_in)} exceeds MAX_INGEST_BATCH_ROWS ({MAX_INGEST_BATCH_ROWS}).",
+            )
+
+        rows_in = [r for r in raw_rows_in if isinstance(r, dict)]
         count = 0
         for raw in rows_in:
-            row = _normalize_row(raw, source="http_ingest")
-            key = (row["session_id"], row["scope"], row["agent_name"] or "__ALL__")
-            _INGESTED_ROWS[key] = row
+            ingest_row_in_memory(raw, source="http_ingest")
             count += 1
 
-        # Also persist ingested rows to local JSONL on the central dashboard server if log_dir is configured
+        # Also persist normalized rows to local JSONL on the central dashboard server if log_dir is configured
         if count > 0 and log_dir:
             try:
                 first_dir = str(log_dir).split(",")[0].strip()
@@ -1359,6 +1433,12 @@ def cli_main() -> None:
         default=os.getenv("ADK_FINOPS_BIGQUERY_TABLE"),
         help="Optional BigQuery table ID (project.dataset.table) for historical + cloud sync",
     )
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        default=os.getenv("ADK_FINOPS_DASHBOARD_API_KEY"),
+        help="Optional shared secret API key to require X-FinOps-Key / Bearer auth on POST /api/ingest",
+    )
     # Rate card sync & pricing extraction flags
     parser.add_argument(
         "--url",
@@ -1432,9 +1512,15 @@ def cli_main() -> None:
 
     import uvicorn
 
-    app = create_dashboard_app(log_dir=args.log_dir, bigquery_table=args.bigquery_table)
+    app = create_dashboard_app(
+        log_dir=args.log_dir,
+        bigquery_table=args.bigquery_table,
+        api_key=args.api_key,
+    )
     print(f"\n📊 ADK FinOps Near-Live Dashboard running at: http://{args.host}:{args.port}")
     print(f"   • Watching local log directory: {Path(args.log_dir).resolve()}")
+    if args.api_key:
+        print("   • Ingest Auth (/api/ingest):    Enabled (X-FinOps-Key / Bearer token required)")
     if args.bigquery_table:
         print(f"   • BigQuery table configured: {args.bigquery_table}")
     print("   • Press Ctrl+C to stop.\n")

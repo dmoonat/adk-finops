@@ -40,6 +40,21 @@ except ImportError:
     bigquery = None  # type: ignore[assignment]
 
 
+import re
+
+_BQ_TABLE_ID_RE = re.compile(r"^[a-zA-Z0-9_:-]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_$]+$")
+
+
+def validate_bq_table_id(table_id: str) -> str:
+    """Validates that a BigQuery table identifier strictly matches `project.dataset.table`."""
+    cleaned = (table_id or "").strip().strip("`")
+    if not _BQ_TABLE_ID_RE.match(cleaned):
+        raise ValueError(
+            f"Invalid BigQuery table_id '{table_id}'. Expected format 'project.dataset.table' with alphanumeric/underscore characters."
+        )
+    return cleaned
+
+
 class BigQueryExporter(BaseExporter):
     """Streams FinOps telemetry into a partitioned & clustered Google BigQuery table."""
 
@@ -84,7 +99,7 @@ class BigQueryExporter(BaseExporter):
                 "Install it with: pip install 'adk-finops[bigquery]'"
             )
 
-        self.table_id = table_id.strip()
+        self.table_id = validate_bq_table_id(table_id)
         self._client = client
         self.auto_create_table = auto_create_table
         self._table_verified = False

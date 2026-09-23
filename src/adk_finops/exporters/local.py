@@ -22,10 +22,11 @@ Pandas, jq, or spreadsheets.
 
 from __future__ import annotations
 
-from datetime import datetime
 import csv
+from datetime import datetime
 import json
 import logging
+import os
 from pathlib import Path
 import threading
 from typing import Any
@@ -138,6 +139,27 @@ class JSONLExporter(BaseExporter):
             )
 
 
+def _sanitize_csv_cell(val: Any) -> Any:
+    """Neutralizes CSV formula injection (CWE-1236) for spreadsheet viewers (Excel / Google Sheets)."""
+    if not isinstance(val, str) or not val:
+        return val
+    first_char = val[0]
+    if first_char in ("=", "+", "@", "\t", "\r"):
+        return f"'{val}"
+    if first_char == "-":
+        # Allow plain negative numbers like "-0.05", but prefix formula strings like "-1+1" or "-@SUM"
+        try:
+            float(val)
+            return val
+        except ValueError:
+            return f"'{val}"
+    return val
+
+
+def _sanitize_csv_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {k: _sanitize_csv_cell(v) for k, v in row.items()}
+
+
 class CSVExporter(BaseExporter):
     """Exports FinOps cost and token telemetry to a local CSV (.csv) file inside a timestamped run folder."""
 
@@ -184,7 +206,7 @@ class CSVExporter(BaseExporter):
                     if write_header:
                         writer.writeheader()
                     for row in rows:
-                        writer.writerow(row)
+                        writer.writerow(_sanitize_csv_row(row))
             msg = f"[FinOps CSV] Saved {len(rows)} row(s) to {self.file_path}"
             print(msg, flush=True)
             logger.info(msg)
@@ -197,12 +219,20 @@ class CSVExporter(BaseExporter):
 class HTTPExporter(BaseExporter):
     """Pushes FinOps telemetry over HTTP POST to a central `adk-finops dashboard` (`/api/ingest`) or webhook."""
 
-    def __init__(self, endpoint: str = "http://127.0.0.1:8088", timeout: float = 5.0):
+    def __init__(
+        self,
+        endpoint: str = "http://127.0.0.1:8088",
+        timeout: float = 5.0,
+        api_key: str | None = None,
+    ):
+        from ..rate_card import _validate_http_url
+
         clean = endpoint.rstrip("/")
         if not clean.endswith("/api/ingest"):
             clean = f"{clean}/api/ingest"
-        self.endpoint = clean
+        self.endpoint = _validate_http_url(clean, allow_http=True)
         self.timeout = timeout
+        self.api_key = api_key or os.environ.get("ADK_FINOPS_DASHBOARD_API_KEY")
 
     def export_summary(
         self,
@@ -213,6 +243,7 @@ class HTTPExporter(BaseExporter):
     ) -> None:
         """Serializes FinOps rows and POSTs them as JSON to `self.endpoint`."""
         import urllib.request
+        from ..rate_card import _create_ssl_context
 
         rows = self._prepare_rows(
             summary=summary,
@@ -224,14 +255,19 @@ class HTTPExporter(BaseExporter):
             return
 
         payload = json.dumps({"rows": rows}).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["X-FinOps-Key"] = self.api_key.strip()
+
         req = urllib.request.Request(
             self.endpoint,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
+        ctx = _create_ssl_context() if self.endpoint.lower().startswith("https://") else None
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
                 if 200 <= resp.status < 300:
                     msg = f"[FinOps HTTP] Pushed {len(rows)} row(s) to central dashboard ({self.endpoint})"
                     print(msg, flush=True)

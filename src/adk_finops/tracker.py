@@ -55,6 +55,9 @@ class BudgetExceededError(Exception):
 class CostTracker:
     """Universal LLM & Tool Cost Tracking Engine with Budget Guardrails."""
 
+    MAX_ACTIVE_SESSIONS: ClassVar[int] = 5_000
+    MAX_TASK_HISTORY: ClassVar[int] = 10_000
+
     _lock: ClassVar[threading.RLock] = threading.RLock()
     _active_runs: ClassVar[dict[str, dict[str, Any]]] = {}
     _registry: ClassVar[RateCardRegistry] = RateCardRegistry()
@@ -283,6 +286,9 @@ class CostTracker:
         eff_agent_limits = agent_limits_usd if agent_limits_usd is not None else agent_budgets
 
         with cls._lock:
+            if session_id and session_id not in cls._budgets and len(cls._budgets) >= cls.MAX_ACTIVE_SESSIONS:
+                oldest_key = next(iter(cls._budgets))
+                cls._budgets.pop(oldest_key, None)
             target = cls._budgets.setdefault(session_id, {}) if session_id else cls._global_budget
             if eff_session_limit is not None:
                 target["session"] = float(eff_session_limit)
@@ -666,6 +672,9 @@ class CostTracker:
 
     @classmethod
     def _create_empty_run(cls, run_id: str) -> dict[str, Any]:
+        while len(cls._active_runs) >= cls.MAX_ACTIVE_SESSIONS and run_id not in cls._active_runs:
+            oldest_key = next(iter(cls._active_runs))
+            cls._active_runs.pop(oldest_key, None)
         return {
             "run_id": run_id,
             "status": "pending",
@@ -1122,6 +1131,8 @@ class CostTracker:
                 if existing and existing is not record_info:
                     existing.update(record_info)
                 elif not existing:
+                    while len(cls._task_history) >= cls.MAX_TASK_HISTORY:
+                        cls._task_history.pop(0)
                     cls._task_history.append(record_info)
 
             return record_info

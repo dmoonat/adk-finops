@@ -47,6 +47,15 @@ DEFAULT_REMOTE_CACHE_TTL_SECONDS = 86400  # 24 hours
 DEFAULT_REMOTE_CACHE_PATH = Path.home() / ".cache" / "adk-finops" / "remote_rates.json"
 
 
+MAX_HTTP_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB ceiling for remote rate card / pricing JSON
+_BLOCKED_METADATA_HOSTS = frozenset({
+    "169.254.169.254",
+    "metadata.google.internal",
+    "metadata",
+    "100.100.100.200",
+})
+
+
 def _create_ssl_context() -> ssl.SSLContext:
     """Creates an SSL context using certifi CA bundle if available."""
     try:
@@ -55,6 +64,47 @@ def _create_ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context(cafile=certifi.where())
     except Exception:
         return ssl.create_default_context()
+
+
+def _validate_http_url(url: str, *, allow_http: bool = True) -> str:
+    """Validates that a URL uses an allowed HTTP(S) scheme and is not a file:// or cloud metadata SSRF target."""
+    import urllib.parse
+
+    cleaned = (url or "").strip()
+    parsed = urllib.parse.urlparse(cleaned)
+    scheme = (parsed.scheme or "").lower()
+    allowed_schemes = ("https", "http") if allow_http else ("https",)
+    if scheme not in allowed_schemes:
+        raise ValueError(
+            f"Unsupported or unsafe URL scheme '{scheme}' in '{cleaned}'. Only {allowed_schemes} are permitted."
+        )
+    host = (parsed.hostname or "").lower()
+    if not host:
+        raise ValueError(f"URL '{cleaned}' is missing a valid hostname.")
+    if host in _BLOCKED_METADATA_HOSTS or host.startswith("169.254."):
+        raise ValueError(f"Access to cloud metadata host '{host}' is blocked for security.")
+    return cleaned
+
+
+def _read_bounded_response(response: Any, max_bytes: int = MAX_HTTP_RESPONSE_BYTES) -> bytes:
+    """Reads up to `max_bytes` from an HTTP response, raising ValueError if exceeded."""
+    chunk = response.read(max_bytes + 1)
+    if len(chunk) > max_bytes:
+        raise ValueError(f"Remote HTTP response exceeded maximum allowed size of {max_bytes} bytes.")
+    return chunk
+
+
+def _safe_non_negative_float(val: Any, default: float = 0.0) -> float:
+    """Converts a value to a finite non-negative float, preventing NaN, Inf, or negative rate injection."""
+    import math
+
+    try:
+        num = float(val)
+    except Exception:
+        return default
+    if not math.isfinite(num) or num < 0.0:
+        raise ValueError(f"Invalid rate value '{val}': pricing rates must be finite and non-negative (>= 0.0).")
+    return num
 
 
 def _resolve_region(explicit_region: str | None = None) -> str:
@@ -146,15 +196,21 @@ class ModelRate:
 
         return cls(
             provider=effective_data.get("provider", "unknown"),
-            input_per_1m=float(effective_data.get("input_per_1m", 0.30)),
-            output_per_1m=float(effective_data.get("output_per_1m", 2.50)),
-            cached_input_per_1m=float(effective_data.get("cached_input_per_1m", 0.03)),
-            input_per_1m_gt_200k=float(in_gt_200k) if in_gt_200k is not None else None,
-            output_per_1m_gt_200k=float(out_gt_200k) if out_gt_200k is not None else None,
-            cached_input_per_1m_gt_200k=float(cached_gt_200k) if cached_gt_200k is not None else None,
-            input_per_1m_gt_128k=float(in_gt_128k) if in_gt_128k is not None else None,
-            output_per_1m_gt_128k=float(out_gt_128k) if out_gt_128k is not None else None,
-            cached_input_per_1m_gt_128k=float(cached_gt_128k) if cached_gt_128k is not None else None,
+            input_per_1m=_safe_non_negative_float(
+                effective_data.get("input_per_1m", effective_data.get("input_rate", 0.30)), 0.30
+            ),
+            output_per_1m=_safe_non_negative_float(
+                effective_data.get("output_per_1m", effective_data.get("output_rate", 2.50)), 2.50
+            ),
+            cached_input_per_1m=_safe_non_negative_float(
+                effective_data.get("cached_input_per_1m", effective_data.get("cached_input_rate", 0.03)), 0.03
+            ),
+            input_per_1m_gt_200k=_safe_non_negative_float(in_gt_200k) if in_gt_200k is not None else None,
+            output_per_1m_gt_200k=_safe_non_negative_float(out_gt_200k) if out_gt_200k is not None else None,
+            cached_input_per_1m_gt_200k=_safe_non_negative_float(cached_gt_200k) if cached_gt_200k is not None else None,
+            input_per_1m_gt_128k=_safe_non_negative_float(in_gt_128k) if in_gt_128k is not None else None,
+            output_per_1m_gt_128k=_safe_non_negative_float(out_gt_128k) if out_gt_128k is not None else None,
+            cached_input_per_1m_gt_128k=_safe_non_negative_float(cached_gt_128k) if cached_gt_128k is not None else None,
             is_fallback=bool(effective_data.get("is_fallback", is_fallback)),
         )
 
@@ -314,15 +370,17 @@ class RateCardRegistry:
 
     def load_from_url(self, url: str, timeout_seconds: float = 5.0) -> dict[str, Any]:
         """Fetches and loads rate cards from a remote HTTP/HTTPS URL."""
+        safe_url = _validate_http_url(url, allow_http=True)
         req = urllib.request.Request(
-            url,
+            safe_url,
             headers={"User-Agent": f"adk-finops/{__version__}"},
         )
-        with urllib.request.urlopen(req, timeout=timeout_seconds, context=_create_ssl_context()) as response:
-            content = response.read().decode("utf-8")
+        ctx = _create_ssl_context() if safe_url.lower().startswith("https://") else None
+        with urllib.request.urlopen(req, timeout=timeout_seconds, context=ctx) as response:
+            content = _read_bounded_response(response).decode("utf-8")
             data = json.loads(content)
             self.load_from_dict(data)
-            logger.info(f"Loaded custom rate card from URL: {url}")
+            logger.info(f"Loaded custom rate card from URL: {safe_url}")
             return data
 
     def sync_remote_rate_card(

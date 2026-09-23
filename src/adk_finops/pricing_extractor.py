@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .rate_card import _create_ssl_context
+from .rate_card import _create_ssl_context, _read_bounded_response, _validate_http_url
 from .rates import DEFAULT_RATES_FILE
 
 logger = logging.getLogger("adk_finops.pricing_extractor")
@@ -44,7 +44,7 @@ logger = logging.getLogger("adk_finops.pricing_extractor")
 GEMINI_ENTERPRISE_PRICING_URL = "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing"
 GCP_BILLING_VERTEX_SERVICE_ID = "C7E2-9256-1C43"  # Vertex AI Service ID in Cloud Billing Catalog
 GCP_BILLING_SKUS_URL_TEMPLATE = (
-    "https://cloudbilling.googleapis.com/v1/services/{service_id}/skus?key={api_key}&pageSize=500"
+    "https://cloudbilling.googleapis.com/v1/services/{service_id}/skus?pageSize=500"
 )
 LITELLM_PRICING_URL = (
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -168,16 +168,18 @@ class GoogleCloudPricingExtractor:
         self.gcp_billing_api_key = gcp_billing_api_key or os.environ.get("GOOGLE_CLOUD_BILLING_API_KEY")
         self.include_new_models = include_new_models
 
-    def _fetch_text(self, url: str) -> str:
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; adk-finops-pricing-extractor/1.0)",
-                "Accept": "application/json, text/html, */*",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=self.timeout_seconds, context=_create_ssl_context()) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+    def _fetch_text(self, url: str, extra_headers: dict[str, str] | None = None) -> str:
+        safe_url = _validate_http_url(url, allow_http=True)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; adk-finops-pricing-extractor/1.0)",
+            "Accept": "application/json, text/html, */*",
+        }
+        if extra_headers:
+            headers.update(extra_headers)
+        req = urllib.request.Request(safe_url, headers=headers)
+        ctx = _create_ssl_context() if safe_url.lower().startswith("https://") else None
+        with urllib.request.urlopen(req, timeout=self.timeout_seconds, context=ctx) as resp:
+            return _read_bounded_response(resp).decode("utf-8", errors="replace")
 
     def extract_from_google_pricing_pages(
         self,
@@ -218,10 +220,12 @@ class GoogleCloudPricingExtractor:
         google_baseline = _load_google_baseline_rates(base_rate_card_path)
         url = GCP_BILLING_SKUS_URL_TEMPLATE.format(
             service_id=GCP_BILLING_VERTEX_SERVICE_ID,
-            api_key=urllib.parse.quote(self.gcp_billing_api_key),
         )
         try:
-            raw = self._fetch_text(url)
+            raw = self._fetch_text(
+                url,
+                extra_headers={"X-Goog-Api-Key": self.gcp_billing_api_key.strip()},
+            )
             payload = json.loads(raw)
             skus = payload.get("skus", [])
             if not isinstance(skus, list):

@@ -122,6 +122,7 @@ class FinOpsCostPlugin(BasePlugin):
         enable_dashboard: bool = False,
         dashboard_port: int = 8088,
         dashboard_endpoint: str | None = None,
+        dashboard_api_key: str | None = None,
         exporters: list[Any] | None = None,
         export_scope: str | None = None,
         export_tags: dict[str, Any] | None = None,
@@ -217,7 +218,7 @@ class FinOpsCostPlugin(BasePlugin):
         if resolved_http:
             from .exporters.local import HTTPExporter
 
-            self.exporters.append(HTTPExporter(endpoint=resolved_http))
+            self.exporters.append(HTTPExporter(endpoint=resolved_http, api_key=dashboard_api_key))
 
         env_otel = os.getenv("ADK_FINOPS_ENABLE_OTEL", "").strip().lower() in ("1", "true", "yes")
         resolved_otlp = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or os.getenv("PHOENIX_COLLECTOR_ENDPOINT")

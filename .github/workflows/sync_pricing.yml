@@ -44,9 +44,10 @@ jobs:
       - name: Run Google Cloud & Multi-Provider Pricing Extraction Framework
         env:
           GOOGLE_CLOUD_BILLING_API_KEY: ${{ secrets.GOOGLE_CLOUD_BILLING_API_KEY }}
+          INCLUDE_NEW_MODELS: ${{ github.event.inputs.include_new_models || 'true' }}
         run: |
           EXTRA_FLAGS=""
-          if [ "${{ github.event.inputs.include_new_models || 'true' }}" = "true" ]; then
+          if [ "$INCLUDE_NEW_MODELS" = "true" ]; then
             EXTRA_FLAGS="--include-new-models"
           fi
           python -m adk_finops.pricing_extractor --update-default $EXTRA_FLAGS
