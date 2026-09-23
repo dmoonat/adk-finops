@@ -1233,6 +1233,42 @@ When **both** local logs (`jsonl_path` / `csv_path`) and `bigquery_table` are en
 
 ---
 
+### Unified CLI & Programmatic Reporting (`adk-finops report` — Local Files + BigQuery)
+
+You can generate a unified, deduplicated FinOps report directly from the terminal (or export it as a GitHub PR Markdown table or JSON file) across **local `.jsonl`/`.csv` logs**, **BigQuery**, or **both combined**:
+
+#### 1. CLI Usage (`adk-finops report`)
+```bash
+# 1. Unified Rich Terminal Report (merges & deduplicates local ./logs + BigQuery if ADK_FINOPS_BIGQUERY_TABLE is set)
+adk-finops report --log-dir ./logs --bigquery-table my-project.finops.agent_costs
+
+# 2. Local Files Only (skip BigQuery)
+adk-finops report --log-dir ./logs --no-bigquery
+
+# 3. BigQuery Only (skip local files) and export as a GitHub PR Markdown report
+adk-finops report --log-dir none --bigquery-table my-project.finops.agent_costs --format markdown --output finops_report.md
+
+# 4. Filter by Root Agent, Sub-Agent, or Session Outcome (--status success|failed) and export as JSON
+adk-finops report --log-dir ./logs --root-agent coordinator_agent --status failed --format json --output failed_runs.json
+```
+
+#### 2. Programmatic Python API (`generate_finops_report`)
+```python
+from adk_finops import generate_finops_report
+
+report = generate_finops_report(
+    log_dir="logs",
+    bigquery_table="my-project.finops.agent_costs",
+    include_bigquery=True,
+    output_format="markdown",          # "table" (Rich CLI), "markdown", or "json"
+    output_path="finops_summary.md",
+    print_report=True,
+)
+print("Total Net Spend:", report["kpis"]["total_cost_usd"])
+```
+
+---
+
 ### Cloud-Agnostic & Local Exporters (`JSONL`, `CSV`, `OpenTelemetry`)
 
 You don't need a cloud warehouse to persist FinOps telemetry. `adk-finops` includes built-in local file exporters (`JSONLExporter`, `CSVExporter`) and an `OpenTelemetryExporter` that work completely offline or with any observability backend (DuckDB, Pandas, Jaeger, Datadog, Arize Phoenix, Honeycomb).

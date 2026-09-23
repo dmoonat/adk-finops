@@ -1396,18 +1396,361 @@ def start_background_dashboard(
     return _DASHBOARD_URL
 
 
+def generate_finops_report(
+    log_dir: str | Path | None = "logs",
+    bigquery_table: str | None = None,
+    include_bigquery: bool = True,
+    root_agent_filter: str | None = None,
+    agent_filter: str | None = None,
+    status_filter: str = "all",
+    output_format: str = "table",
+    output_path: str | Path | None = None,
+    print_report: bool = True,
+) -> dict[str, Any]:
+    """Generates a unified FinOps telemetry report from local JSONL/CSV files and/or BigQuery.
+
+    Deduplicates records by `(session_id, scope, agent_name)` across local logs and BigQuery,
+    computes executive KPIs, hierarchical Root -> Sub-Agent attribution, model breakdown,
+    and tool fees, and renders as a Rich terminal table, GitHub Markdown, or JSON.
+    """
+    eff_log_dir = None if str(log_dir).strip().lower() in ("", "none", "null") else log_dir
+    telemetry = collect_telemetry_rows(
+        log_dir=eff_log_dir,
+        include_bigquery=include_bigquery,
+        bigquery_table=bigquery_table,
+    )
+    all_rows = telemetry.get("rows", [])
+
+    # Apply optional filters
+    filtered: list[dict[str, Any]] = []
+    for r in all_rows:
+        if root_agent_filter and (r.get("root_agent_name") or "") != root_agent_filter:
+            continue
+        if agent_filter and (r.get("agent_name") or "") != agent_filter:
+            continue
+        if status_filter == "success" and r.get("is_failure"):
+            continue
+        if status_filter == "failed" and not r.get("is_failure"):
+            continue
+        filtered.append(r)
+
+    # Separate session-level rollups (to avoid double-counting against per-agent rows) and per-agent rows
+    rollup_rows = [r for r in filtered if r.get("agent_role") == "root_rollup" or not r.get("agent_name")]
+    sub_agent_rows = [r for r in filtered if r.get("agent_role") in ("root_self", "sub_agent") and r.get("agent_name")]
+
+    # If filtering by a specific sub-agent, use sub_agent_rows as primary KPI base
+    kpi_base = sub_agent_rows if (agent_filter and not rollup_rows) else (rollup_rows or sub_agent_rows)
+
+    unique_sessions = {r.get("session_id") for r in kpi_base if r.get("session_id")}
+    failed_sessions = {r.get("session_id") for r in kpi_base if r.get("session_id") and r.get("is_failure")}
+    success_sessions = unique_sessions - failed_sessions
+
+    total_cost_usd = round(sum(float(r.get("total_cost_usd", 0.0)) for r in kpi_base), 6)
+    llm_cost_usd = round(sum(float(r.get("llm_cost_usd", 0.0)) for r in kpi_base), 6)
+    tool_cost_usd = round(sum(float(r.get("tool_cost_usd", 0.0)) for r in kpi_base), 6)
+    gross_cost_usd = round(sum(float(r.get("gross_cost_usd", 0.0)) for r in kpi_base), 6)
+    savings_usd = round(sum(float(r.get("savings_usd", 0.0)) for r in kpi_base), 6)
+    savings_pct = round((savings_usd / gross_cost_usd) * 100.0, 1) if gross_cost_usd > 0 else 0.0
+
+    wasted_cost_usd = round(
+        sum(float(r.get("total_cost_usd", 0.0)) for r in kpi_base if r.get("is_failure")), 6
+    )
+    effective_cost_usd = round(max(0.0, total_cost_usd - wasted_cost_usd), 6)
+    wasted_pct = round((wasted_cost_usd / total_cost_usd) * 100.0, 1) if total_cost_usd > 0 else 0.0
+
+    prompt_tokens = sum(int(r.get("prompt_tokens", 0)) for r in kpi_base)
+    completion_tokens = sum(int(r.get("completion_tokens", 0)) for r in kpi_base)
+    thoughts_tokens = sum(int(r.get("thoughts_tokens", 0)) for r in kpi_base)
+    cached_tokens = sum(int(r.get("cached_tokens", 0)) for r in kpi_base)
+    total_tokens = sum(int(r.get("total_tokens", 0)) for r in kpi_base)
+
+    # Per-Agent Breakdown (from sub_agent_rows, falling back to rollup_rows if only single-agent rows exist)
+    agent_source_rows = sub_agent_rows if sub_agent_rows else rollup_rows
+    by_agent: dict[str, dict[str, Any]] = {}
+    for r in agent_source_rows:
+        a_name = r.get("agent_name") or r.get("root_agent_name") or "root_agent"
+        root_name = r.get("root_agent_name") or a_name
+        entry = by_agent.setdefault(
+            a_name,
+            {
+                "agent_name": a_name,
+                "root_agent_name": root_name,
+                "sessions": set(),
+                "total_tokens": 0,
+                "llm_cost_usd": 0.0,
+                "tool_cost_usd": 0.0,
+                "total_cost_usd": 0.0,
+                "savings_usd": 0.0,
+            },
+        )
+        if r.get("session_id"):
+            entry["sessions"].add(r["session_id"])
+        entry["total_tokens"] += int(r.get("total_tokens", 0))
+        entry["llm_cost_usd"] = round(entry["llm_cost_usd"] + float(r.get("llm_cost_usd", 0.0)), 6)
+        entry["tool_cost_usd"] = round(entry["tool_cost_usd"] + float(r.get("tool_cost_usd", 0.0)), 6)
+        entry["total_cost_usd"] = round(entry["total_cost_usd"] + float(r.get("total_cost_usd", 0.0)), 6)
+        entry["savings_usd"] = round(entry["savings_usd"] + float(r.get("savings_usd", 0.0)), 6)
+
+    agent_list: list[dict[str, Any]] = []
+    for a_name, info in sorted(by_agent.items(), key=lambda x: x[1]["total_cost_usd"], reverse=True):
+        pct = round((info["total_cost_usd"] / total_cost_usd) * 100.0, 1) if total_cost_usd > 0 else 0.0
+        agent_list.append(
+            {
+                "agent_name": a_name,
+                "root_agent_name": info["root_agent_name"],
+                "sessions_count": len(info["sessions"]),
+                "total_tokens": info["total_tokens"],
+                "llm_cost_usd": info["llm_cost_usd"],
+                "tool_cost_usd": info["tool_cost_usd"],
+                "total_cost_usd": info["total_cost_usd"],
+                "savings_usd": info["savings_usd"],
+                "share_pct": pct,
+            }
+        )
+
+    # Per-Model Breakdown
+    by_model: dict[str, dict[str, Any]] = {}
+    for r in agent_source_rows:
+        m_raw = r.get("model_name") or "unknown"
+        for m_name in [m.strip() for m in str(m_raw).split(",") if m.strip()]:
+            m_entry = by_model.setdefault(
+                m_name,
+                {
+                    "model_name": m_name,
+                    "rows": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "thoughts_tokens": 0,
+                    "cached_tokens": 0,
+                    "total_tokens": 0,
+                    "llm_cost_usd": 0.0,
+                    "savings_usd": 0.0,
+                },
+            )
+            m_entry["rows"] += 1
+            m_entry["prompt_tokens"] += int(r.get("prompt_tokens", 0))
+            m_entry["completion_tokens"] += int(r.get("completion_tokens", 0))
+            m_entry["thoughts_tokens"] += int(r.get("thoughts_tokens", 0))
+            m_entry["cached_tokens"] += int(r.get("cached_tokens", 0))
+            m_entry["total_tokens"] += int(r.get("total_tokens", 0))
+            m_entry["llm_cost_usd"] = round(m_entry["llm_cost_usd"] + float(r.get("llm_cost_usd", 0.0)), 6)
+            m_entry["savings_usd"] = round(m_entry["savings_usd"] + float(r.get("savings_usd", 0.0)), 6)
+
+    model_list = sorted(by_model.values(), key=lambda x: x["llm_cost_usd"], reverse=True)
+
+    # Per-Tool Breakdown
+    by_tool: dict[tuple[str, str], dict[str, Any]] = {}
+    for r in agent_source_rows:
+        tb = r.get("breakdown_by_tool")
+        if isinstance(tb, dict):
+            for ag_key, t_map in tb.items():
+                if isinstance(t_map, dict):
+                    for t_name, t_info in t_map.items():
+                        calls = int(t_info.get("calls", 0)) if isinstance(t_info, dict) else int(t_info or 0)
+                        cost = float(t_info.get("total_cost_usd", 0.0)) if isinstance(t_info, dict) else 0.0
+                        item = by_tool.setdefault(
+                            (ag_key, t_name),
+                            {"agent_name": ag_key, "tool_name": t_name, "calls": 0, "total_cost_usd": 0.0},
+                        )
+                        item["calls"] += calls
+                        item["total_cost_usd"] = round(item["total_cost_usd"] + cost, 6)
+
+    tool_list = sorted(by_tool.values(), key=lambda x: x["total_cost_usd"], reverse=True)
+
+    report_data: dict[str, Any] = {
+        "sources": telemetry.get("sources", []),
+        "log_dir": str(eff_log_dir) if eff_log_dir else None,
+        "bigquery_table": telemetry.get("bigquery_table") if include_bigquery else None,
+        "bigquery_error": telemetry.get("bigquery_error"),
+        "kpis": {
+            "total_sessions": len(unique_sessions),
+            "success_sessions": len(success_sessions),
+            "failed_sessions": len(failed_sessions),
+            "total_cost_usd": total_cost_usd,
+            "llm_cost_usd": llm_cost_usd,
+            "tool_cost_usd": tool_cost_usd,
+            "gross_cost_usd": gross_cost_usd,
+            "savings_usd": savings_usd,
+            "savings_pct": savings_pct,
+            "effective_cost_usd": effective_cost_usd,
+            "wasted_cost_usd": wasted_cost_usd,
+            "wasted_pct": wasted_pct,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "thoughts_tokens": thoughts_tokens,
+            "cached_tokens": cached_tokens,
+            "total_tokens": total_tokens,
+        },
+        "by_agent": agent_list,
+        "by_model": model_list,
+        "by_tool": tool_list,
+        "recent_sessions": [
+            {
+                "session_id": r.get("session_id"),
+                "root_agent_name": r.get("root_agent_name") or r.get("agent_name") or "root_agent",
+                "status": r.get("status", "success"),
+                "total_tokens": int(r.get("total_tokens", 0)),
+                "savings_usd": float(r.get("savings_usd", 0.0)),
+                "total_cost_usd": float(r.get("total_cost_usd", 0.0)),
+                "source": r.get("source", "local"),
+            }
+            for r in kpi_base[:15]
+        ],
+    }
+
+    fmt = (output_format or "table").strip().lower()
+    rendered_text = ""
+
+    if fmt == "json":
+        rendered_text = json.dumps(report_data, indent=2)
+        if print_report:
+            print(rendered_text)
+    elif fmt == "markdown":
+        k = report_data["kpis"]
+        src_str = ", ".join(report_data["sources"]) or "none"
+        lines = [
+            "# 📊 ADK FinOps Telemetry Report",
+            "",
+            f"- **Data Sources Merged:** `{src_str}`",
+        ]
+        if report_data["bigquery_table"]:
+            lines.append(f"- **BigQuery Table:** `{report_data['bigquery_table']}`")
+        if report_data["log_dir"]:
+            lines.append(f"- **Local Log Directory:** `{report_data['log_dir']}`")
+        lines.extend(
+            [
+                "",
+                "## 1. Executive KPIs",
+                "",
+                "| Metric | Value | Details |",
+                "| :--- | :--- | :--- |",
+                f"| **Total Net Spend** | **${k['total_cost_usd']:.6f}** | LLM: `${k['llm_cost_usd']:.6f}` • Tool Fees: `${k['tool_cost_usd']:.6f}` |",
+                f"| **Context Caching Savings** | **${k['savings_usd']:.6f}** (`{k['savings_pct']:.1f}%`) | Gross without caching: `${k['gross_cost_usd']:.6f}` |",
+                f"| **Effective vs. Wasted Spend** | **${k['effective_cost_usd']:.6f}** effective | Wasted on failed runs: `${k['wasted_cost_usd']:.6f}` (`{k['wasted_pct']:.1f}%`) |",
+                f"| **Sessions Analyzed** | **{k['total_sessions']}** | ✅ Success: `{k['success_sessions']}` • ❌ Failed: `{k['failed_sessions']}` |",
+                f"| **Total Tokens** | **{k['total_tokens']:,}** | In: `{k['prompt_tokens']:,}` (Cached: `{k['cached_tokens']:,}`) • Out: `{k['completion_tokens']:,}` (Thoughts: `{k['thoughts_tokens']:,}`) |",
+                "",
+                "## 2. Per-Agent Cost Attribution",
+                "",
+                "| Root Agent | Agent Name | Sessions | Tokens | LLM Cost | Tool Fees | Total Cost | Share % |",
+                "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for a in report_data["by_agent"]:
+            lines.append(
+                f"| `{a['root_agent_name']}` | **`{a['agent_name']}`** | {a['sessions_count']} | {a['total_tokens']:,} | ${a['llm_cost_usd']:.6f} | ${a['tool_cost_usd']:.6f} | **${a['total_cost_usd']:.6f}** | {a['share_pct']:.1f}% |"
+            )
+        lines.extend(
+            [
+                "",
+                "## 3. Per-Model Breakdown",
+                "",
+                "| Model | Records | Prompt Tokens | Completion Tokens | Thoughts | Cached | LLM Cost | Savings |",
+                "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for m in report_data["by_model"]:
+            lines.append(
+                f"| **`{m['model_name']}`** | {m['rows']} | {m['prompt_tokens']:,} | {m['completion_tokens']:,} | {m['thoughts_tokens']:,} | {m['cached_tokens']:,} | **${m['llm_cost_usd']:.6f}** | ${m['savings_usd']:.6f} |"
+            )
+        rendered_text = "\n".join(lines) + "\n"
+        if print_report:
+            print(rendered_text)
+    else:
+        # Rich terminal table output
+        try:
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
+
+            console = Console()
+            k = report_data["kpis"]
+            src_str = ", ".join(report_data["sources"]) or "none"
+            header_lines = [
+                f"[bold cyan]Sources Merged:[/bold cyan] {src_str}"
+                + (f"  |  [bold cyan]BigQuery:[/bold cyan] {report_data['bigquery_table']}" if report_data["bigquery_table"] else ""),
+                f"[bold green]Total Net Spend:[/bold green] ${k['total_cost_usd']:.6f} (LLM: ${k['llm_cost_usd']:.6f} | Tools: ${k['tool_cost_usd']:.6f})   "
+                f"[bold yellow]Caching Savings:[/bold yellow] ${k['savings_usd']:.6f} ({k['savings_pct']:.1f}%)",
+                f"[bold white]Sessions:[/bold white] {k['total_sessions']} (✅ {k['success_sessions']} success | ❌ {k['failed_sessions']} failed)   "
+                f"[bold red]Wasted Spend:[/bold red] ${k['wasted_cost_usd']:.6f} ({k['wasted_pct']:.1f}%)   "
+                f"[bold magenta]Total Tokens:[/bold magenta] {k['total_tokens']:,}",
+            ]
+            if report_data.get("bigquery_error"):
+                header_lines.append(f"[yellow]⚠️ BigQuery Note: {report_data['bigquery_error']}[/yellow]")
+
+            if print_report:
+                console.print(Panel("\n".join(header_lines), title="📊 ADK FinOps Unified Telemetry Report (Local + BigQuery)", border_style="cyan"))
+
+                ag_table = Table(title="🤖 Per-Agent Cost Attribution (Root ➔ Sub-Agent)", show_header=True, header_style="bold cyan")
+                ag_table.add_column("Root Agent", style="dim")
+                ag_table.add_column("Agent Name", style="bold white")
+                ag_table.add_column("Sessions", justify="right")
+                ag_table.add_column("Tokens", justify="right")
+                ag_table.add_column("LLM Cost", justify="right")
+                ag_table.add_column("Tool Fees", justify="right")
+                ag_table.add_column("Total Cost", justify="right", style="bold green")
+                ag_table.add_column("Share %", justify="right")
+                for a in report_data["by_agent"]:
+                    ag_table.add_row(
+                        str(a["root_agent_name"]),
+                        str(a["agent_name"]),
+                        str(a["sessions_count"]),
+                        f"{a['total_tokens']:,}",
+                        f"${a['llm_cost_usd']:.6f}",
+                        f"${a['tool_cost_usd']:.6f}",
+                        f"${a['total_cost_usd']:.6f}",
+                        f"{a['share_pct']:.1f}%",
+                    )
+                console.print(ag_table)
+
+                m_table = Table(title="🧠 Per-Model Spend & Token Breakdown", show_header=True, header_style="bold magenta")
+                m_table.add_column("Model", style="bold white")
+                m_table.add_column("Records", justify="right")
+                m_table.add_column("Prompt", justify="right")
+                m_table.add_column("Completion", justify="right")
+                m_table.add_column("Thoughts", justify="right")
+                m_table.add_column("Cached", justify="right")
+                m_table.add_column("LLM Cost", justify="right", style="bold green")
+                m_table.add_column("Savings", justify="right", style="yellow")
+                for m in report_data["by_model"]:
+                    m_table.add_row(
+                        str(m["model_name"]),
+                        str(m["rows"]),
+                        f"{m['prompt_tokens']:,}",
+                        f"{m['completion_tokens']:,}",
+                        f"{m['thoughts_tokens']:,}",
+                        f"{m['cached_tokens']:,}",
+                        f"${m['llm_cost_usd']:.6f}",
+                        f"${m['savings_usd']:.6f}",
+                    )
+                console.print(m_table)
+        except Exception:
+            if print_report:
+                print(json.dumps(report_data, indent=2))
+
+    if output_path:
+        out_p = Path(output_path)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        out_content = rendered_text if rendered_text else json.dumps(report_data, indent=2)
+        out_p.write_text(out_content, encoding="utf-8")
+        if print_report:
+            print(f"\n💾 Saved FinOps report to {out_p.resolve()}")
+
+    return report_data
+
+
 def cli_main() -> None:
-    """CLI entrypoint for `adk-finops` (`dashboard`, `sync-rates`, `extract-pricing`)."""
+    """CLI entrypoint for `adk-finops` (`dashboard`, `report`, `sync-rates`, `extract-pricing`)."""
     parser = argparse.ArgumentParser(
         prog="adk-finops",
-        description="ADK FinOps CLI: Near-Live Dashboard, Dynamic Remote Rate Card Sync & Google Cloud Pricing Extractor",
+        description="ADK FinOps CLI: Near-Live Dashboard, Unified Local/BigQuery Reporting, & Pricing Sync",
     )
     parser.add_argument(
         "command",
         nargs="?",
         default="dashboard",
-        choices=["dashboard", "sync-rates", "extract-pricing"],
-        help="Command to execute: 'dashboard' (default), 'sync-rates', or 'extract-pricing'",
+        choices=["dashboard", "report", "sync-rates", "extract-pricing"],
+        help="Command to execute: 'dashboard' (default), 'report', 'sync-rates', or 'extract-pricing'",
     )
     parser.add_argument(
         "--port",
@@ -1425,13 +1768,44 @@ def cli_main() -> None:
         "--log-dir",
         type=str,
         default=os.getenv("ADK_FINOPS_LOG_DIR", "logs"),
-        help="Directory containing local timestamped JSONL/CSV FinOps logs (default: logs)",
+        help="Directory containing local timestamped JSONL/CSV FinOps logs (default: logs; pass 'none' for BigQuery-only)",
     )
     parser.add_argument(
         "--bigquery-table",
         type=str,
         default=os.getenv("ADK_FINOPS_BIGQUERY_TABLE"),
         help="Optional BigQuery table ID (project.dataset.table) for historical + cloud sync",
+    )
+    parser.add_argument(
+        "--no-bigquery",
+        action="store_true",
+        help="Disable BigQuery querying in 'report' (use local JSONL/CSV logs only)",
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        default="table",
+        choices=["table", "markdown", "json"],
+        help="Output format for 'report': 'table' (Rich CLI), 'markdown' (GitHub PR table), or 'json'",
+    )
+    parser.add_argument(
+        "--root-agent",
+        type=str,
+        default=None,
+        help="Filter 'report' by Root Agent name",
+    )
+    parser.add_argument(
+        "--agent",
+        type=str,
+        default=None,
+        help="Filter 'report' by Sub-Agent name",
+    )
+    parser.add_argument(
+        "--status",
+        type=str,
+        default="all",
+        choices=["all", "success", "failed"],
+        help="Filter 'report' by session outcome status",
     )
     parser.add_argument(
         "--api-key",
@@ -1466,7 +1840,7 @@ def cli_main() -> None:
         "--output",
         type=str,
         default=None,
-        help="Output JSON path for 'extract-pricing'",
+        help="Output file path for 'report' or 'extract-pricing'",
     )
     parser.add_argument(
         "--include-new-models",
@@ -1480,6 +1854,20 @@ def cli_main() -> None:
         help="Optional Google Cloud Billing Catalog API key for 'extract-pricing'",
     )
     args = parser.parse_args()
+
+    if args.command == "report":
+        generate_finops_report(
+            log_dir=args.log_dir,
+            bigquery_table=args.bigquery_table,
+            include_bigquery=not args.no_bigquery,
+            root_agent_filter=args.root_agent,
+            agent_filter=args.agent,
+            status_filter=args.status,
+            output_format=args.format,
+            output_path=args.output,
+            print_report=True,
+        )
+        return
 
     if args.command == "sync-rates":
         res = CostTracker.sync_remote_rate_card(

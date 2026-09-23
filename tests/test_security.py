@@ -21,6 +21,7 @@ from adk_finops.dashboard import (
     MAX_INGESTED_ROWS,
     _INGESTED_ROWS,
     _INGESTED_ROWS_LOCK,
+    generate_finops_report,
     ingest_row_in_memory,
 )
 from adk_finops.exporters.bigquery import validate_bq_table_id
@@ -174,6 +175,58 @@ class TestSecurityRemediations(unittest.TestCase):
         content = workflow_path.read_text(encoding="utf-8")
         self.assertIn("INCLUDE_NEW_MODELS: ${{ github.event.inputs.include_new_models", content)
         self.assertIn('if [ "$INCLUDE_NEW_MODELS" = "true" ]', content)
+
+    def test_v100_generate_finops_report_local_and_formats(self) -> None:
+        """v1.0.0: Verify generate_finops_report aggregates rows and writes markdown/json reports."""
+        from adk_finops.exporters.local import JSONLExporter
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            jsonl_file = Path(tmpdir) / "finops_costs.jsonl"
+            exporter = JSONLExporter(jsonl_file, timestamp_dir=False)
+            exporter.export_summary(
+                {
+                    "session": {
+                        "run_id": "report_sess_01",
+                        "root_agent_name": "coordinator_agent",
+                        "total_cost_usd": 0.050,
+                        "llm_cost_usd": 0.040,
+                        "tool_cost_usd": 0.010,
+                        "gross_cost_usd": 0.060,
+                        "savings_usd": 0.010,
+                        "total_tokens": 5000,
+                        "breakdown_by_agent": {
+                            "coordinator_agent": {
+                                "total_cost_usd": 0.010,
+                                "llm_cost_usd": 0.010,
+                                "total_tokens": 1000,
+                                "model_name": "gemini-2.5-flash",
+                            },
+                            "research_agent": {
+                                "total_cost_usd": 0.040,
+                                "llm_cost_usd": 0.030,
+                                "tool_cost_usd": 0.010,
+                                "total_tokens": 4000,
+                                "model_name": "gemini-2.5-pro",
+                            },
+                        },
+                    }
+                },
+                scope="session",
+            )
+
+            md_out = Path(tmpdir) / "report.md"
+            rep = generate_finops_report(
+                log_dir=tmpdir,
+                include_bigquery=False,
+                output_format="markdown",
+                output_path=md_out,
+                print_report=False,
+            )
+            self.assertEqual(rep["kpis"]["total_sessions"], 1)
+            self.assertAlmostEqual(rep["kpis"]["total_cost_usd"], 0.050, places=5)
+            self.assertEqual(len(rep["by_agent"]), 2)
+            self.assertTrue(md_out.exists())
+            self.assertIn("research_agent", md_out.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -95,7 +95,7 @@ except ImportError:
         "render_task_efficiency_table",
     ]
 
-from .dashboard import create_dashboard_app, start_background_dashboard
+from .dashboard import create_dashboard_app, generate_finops_report, start_background_dashboard
 from .exporters import (
     BaseExporter,
     CSVExporter,
@@ -119,6 +119,7 @@ __all__.extend(
         "JSONLExporter",
         "OpenTelemetryExporter",
         "create_dashboard_app",
+        "generate_finops_report",
         "start_background_dashboard",
         "generate_optimization_insights",
         "ADVISOR_DISCLAIMER",
