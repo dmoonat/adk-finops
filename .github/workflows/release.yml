@@ -50,12 +50,13 @@ jobs:
 
       - name: Install build & test dependencies
         run: |
-          python -m pip install --upgrade pip build twine pytest
+          python -m pip install --upgrade pip build twine pytest pytest-asyncio
           pip install -e ".[rich]"
 
-      - name: Run rate card, tool billing, pre-flight guard & display unit tests
+      - name: Run complete unit & security test suite (all 13 test modules)
         run: |
-          pytest tests/test_rate_card.py tests/test_plugin.py tests/test_preflight_guard.py tests/test_display.py -q
+          pytest tests/ -q
+          python tests/run_all_tests.py
 
       - name: Resolve or auto-bump package version
         id: version
