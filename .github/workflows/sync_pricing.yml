@@ -92,3 +92,16 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
+
+      - name: Create GitHub Release
+        if: steps.check_changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.check_changes.outputs.new_version }}"
+          gh release create "$TAG" dist/* \
+            --title "$TAG — Automated LLM Pricing Rate Card Sync" \
+            --notes "Automated synchronization of Google Cloud Gemini Enterprise & multi-provider pricing in \`default_rates.json\`." \
+            --generate-notes \
+            --latest
+
