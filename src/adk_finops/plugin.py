@@ -28,13 +28,40 @@ import os
 from pathlib import Path
 from typing import Any
 
-from google.adk.agents.invocation_context import InvocationContext
-from google.adk.models.llm_response import LlmResponse
-from google.adk.plugins import BasePlugin
-from google.adk.plugins.base_plugin import CallbackContext
-from google.adk.tools import BaseTool
-from google.adk.tools.tool_context import ToolContext
-from google.genai import types
+try:
+    from google.adk.agents.invocation_context import InvocationContext
+    from google.adk.models.llm_response import LlmResponse
+    from google.adk.plugins import BasePlugin
+    from google.adk.plugins.base_plugin import CallbackContext
+    from google.adk.tools import BaseTool
+    from google.adk.tools.tool_context import ToolContext
+    from google.genai import types
+except ImportError:
+    InvocationContext = Any  # type: ignore[misc,assignment]
+    LlmResponse = Any  # type: ignore[misc,assignment]
+    CallbackContext = Any  # type: ignore[misc,assignment]
+    ToolContext = Any  # type: ignore[misc,assignment]
+
+    class BasePlugin:  # type: ignore[no-redef]
+        """Fallback shim when google-adk is not installed."""
+
+        def __init__(self, name: str = "finops_cost_tracker") -> None:
+            self.name = name
+
+    class BaseTool:  # type: ignore[no-redef]
+        """Fallback shim when google-adk is not installed."""
+
+    class _FallbackTypes:
+        class Part:
+            @staticmethod
+            def from_text(*, text: str) -> dict[str, str]:
+                return {"text": text}
+
+        class Content:
+            def __init__(self, parts: list[Any] | None = None) -> None:
+                self.parts = parts or []
+
+    types = _FallbackTypes()  # type: ignore[assignment]
 
 from .tracker import BudgetExceededError, CostTracker
 
@@ -536,6 +563,12 @@ class FinOpsCostPlugin(BasePlugin):
             is_grounding = tool_type in (
                 "vertex_grounding_google_search",
                 "vertex_grounding_private",
+                "google_search",
+                "google_maps_grounding",
+                "web_grounding",
+                "enterprise_web_search",
+                "vertex_search",
+                "vertex_ai_search",
             )
             log_prefix = "[FinOps Grounding]" if is_grounding else "[FinOps Tool]"
             msg = f"{log_prefix} turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}"
