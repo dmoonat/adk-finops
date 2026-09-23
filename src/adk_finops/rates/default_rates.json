@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "2026.09",
+  "last_updated_utc": "2026-09-23T04:46:26.831931+00:00",
   "source_urls": [
     "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -23,17 +24,17 @@
   "models": {
     "gemini-3.1-pro-preview": {
       "provider": "google",
-      "input_per_1m": 2.00,
-      "output_per_1m": 12.00,
-      "cached_input_per_1m": 0.20,
-      "input_per_1m_gt_200k": 4.00,
-      "output_per_1m_gt_200k": 18.00,
-      "cached_input_per_1m_gt_200k": 0.40
+      "input_per_1m": 2.0,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.2,
+      "input_per_1m_gt_200k": 4.0,
+      "output_per_1m_gt_200k": 18.0,
+      "cached_input_per_1m_gt_200k": 0.4
     },
     "gemini-3.8-flash-cyber": {
       "provider": "google",
-      "input_per_1m": 1.50,
-      "output_per_1m": 7.50,
+      "input_per_1m": 1.5,
+      "output_per_1m": 7.5,
       "cached_input_per_1m": 0.15,
       "non_global": {
         "input_per_1m": 1.65,
@@ -52,8 +53,8 @@
         "cached_input_per_1m": 0.0825
       },
       "standard_pricing_2027": {
-        "input_per_1m": 1.50,
-        "output_per_1m": 7.50,
+        "input_per_1m": 1.5,
+        "output_per_1m": 7.5,
         "cached_input_per_1m": 0.15,
         "non_global": {
           "input_per_1m": 1.65,
@@ -73,8 +74,8 @@
         "cached_input_per_1m": 0.0825
       },
       "standard_pricing_2027": {
-        "input_per_1m": 1.50,
-        "output_per_1m": 7.50,
+        "input_per_1m": 1.5,
+        "output_per_1m": 7.5,
         "cached_input_per_1m": 0.15,
         "non_global": {
           "input_per_1m": 1.65,
@@ -94,8 +95,8 @@
         "cached_input_per_1m": 0.0825
       },
       "standard_pricing_2027": {
-        "input_per_1m": 1.50,
-        "output_per_1m": 7.50,
+        "input_per_1m": 1.5,
+        "output_per_1m": 7.5,
         "cached_input_per_1m": 0.15,
         "non_global": {
           "input_per_1m": 1.65,
@@ -106,19 +107,19 @@
     },
     "gemini-3.5-flash": {
       "provider": "google",
-      "input_per_1m": 1.50,
-      "output_per_1m": 9.00,
+      "input_per_1m": 1.5,
+      "output_per_1m": 9.0,
       "cached_input_per_1m": 0.15,
       "non_global": {
         "input_per_1m": 1.65,
-        "output_per_1m": 9.90,
+        "output_per_1m": 9.9,
         "cached_input_per_1m": 0.165
       }
     },
     "gemini-3.5-flash-lite": {
       "provider": "google",
-      "input_per_1m": 0.30,
-      "output_per_1m": 2.50,
+      "input_per_1m": 0.3,
+      "output_per_1m": 2.5,
       "cached_input_per_1m": 0.03,
       "non_global": {
         "input_per_1m": 0.33,
@@ -129,7 +130,7 @@
     "gemini-3.1-flash-lite": {
       "provider": "google",
       "input_per_1m": 0.25,
-      "output_per_1m": 1.50,
+      "output_per_1m": 1.5,
       "cached_input_per_1m": 0.025,
       "non_global": {
         "input_per_1m": 0.275,
@@ -139,89 +140,89 @@
     },
     "gemini-3-flash-preview": {
       "provider": "google",
-      "input_per_1m": 0.50,
-      "output_per_1m": 3.00,
+      "input_per_1m": 0.5,
+      "output_per_1m": 3.0,
       "cached_input_per_1m": 0.05
     },
     "gemini-3-flash": {
       "provider": "google",
-      "input_per_1m": 0.50,
-      "output_per_1m": 3.00,
+      "input_per_1m": 0.5,
+      "output_per_1m": 3.0,
       "cached_input_per_1m": 0.05
     },
     "gemini-3.1-flash-lite-image": {
       "provider": "google",
       "input_per_1m": 0.25,
-      "output_per_1m": 1.50,
+      "output_per_1m": 1.5,
       "cached_input_per_1m": 0.025
     },
     "gemini-3.1-flash-image": {
       "provider": "google",
-      "input_per_1m": 0.50,
-      "output_per_1m": 3.00,
+      "input_per_1m": 0.5,
+      "output_per_1m": 3.0,
       "cached_input_per_1m": 0.05
     },
     "gemini-3-pro-image": {
       "provider": "google",
-      "input_per_1m": 2.00,
-      "output_per_1m": 12.00,
-      "cached_input_per_1m": 0.20,
-      "input_per_1m_gt_200k": 4.00,
-      "output_per_1m_gt_200k": 18.00,
-      "cached_input_per_1m_gt_200k": 0.40
+      "input_per_1m": 2.0,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.2,
+      "input_per_1m_gt_200k": 4.0,
+      "output_per_1m_gt_200k": 18.0,
+      "cached_input_per_1m_gt_200k": 0.4
     },
     "gemini-2.5-pro": {
       "provider": "google",
       "input_per_1m": 1.25,
-      "output_per_1m": 10.00,
+      "output_per_1m": 10.0,
       "cached_input_per_1m": 0.125,
-      "input_per_1m_gt_200k": 2.50,
-      "output_per_1m_gt_200k": 15.00,
+      "input_per_1m_gt_200k": 2.5,
+      "output_per_1m_gt_200k": 15.0,
       "cached_input_per_1m_gt_200k": 0.25
     },
     "gemini-2.5-pro-computer-use-preview": {
       "provider": "google",
       "input_per_1m": 1.25,
-      "output_per_1m": 10.00,
+      "output_per_1m": 10.0,
       "cached_input_per_1m": 0.125,
-      "input_per_1m_gt_200k": 2.50,
-      "output_per_1m_gt_200k": 15.00,
+      "input_per_1m_gt_200k": 2.5,
+      "output_per_1m_gt_200k": 15.0,
       "cached_input_per_1m_gt_200k": 0.25
     },
     "gemini-2.5-flash": {
       "provider": "google",
-      "input_per_1m": 0.30,
-      "output_per_1m": 2.50,
+      "input_per_1m": 0.3,
+      "output_per_1m": 2.5,
       "cached_input_per_1m": 0.03,
-      "input_per_1m_gt_200k": 0.30,
-      "output_per_1m_gt_200k": 2.50,
+      "input_per_1m_gt_200k": 0.3,
+      "output_per_1m_gt_200k": 2.5,
       "cached_input_per_1m_gt_200k": 0.03
     },
     "gemini-2.5-flash-lite": {
       "provider": "google",
-      "input_per_1m": 0.10,
-      "output_per_1m": 0.40,
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.4,
       "cached_input_per_1m": 0.01,
-      "input_per_1m_gt_200k": 0.10,
-      "output_per_1m_gt_200k": 0.40,
+      "input_per_1m_gt_200k": 0.1,
+      "output_per_1m_gt_200k": 0.4,
       "cached_input_per_1m_gt_200k": 0.01
     },
     "gemini-2.5-flash-image": {
       "provider": "google",
-      "input_per_1m": 0.30,
-      "output_per_1m": 2.50,
+      "input_per_1m": 0.3,
+      "output_per_1m": 2.5,
       "cached_input_per_1m": 0.03
     },
     "gemini-2.5-flash-live": {
       "provider": "google",
-      "input_per_1m": 0.50,
-      "output_per_1m": 2.00,
+      "input_per_1m": 0.5,
+      "output_per_1m": 2.0,
       "cached_input_per_1m": 0.05
     },
     "gemini-2.0-flash": {
       "provider": "google",
       "input_per_1m": 0.15,
-      "output_per_1m": 0.60,
+      "output_per_1m": 0.6,
       "cached_input_per_1m": 0.0375
     },
     "codemender": {
@@ -230,64 +231,64 @@
       "output_per_1m": 3.75,
       "cached_input_per_1m": 0.075,
       "standard_pricing_2027": {
-        "input_per_1m": 1.50,
-        "output_per_1m": 7.50,
+        "input_per_1m": 1.5,
+        "output_per_1m": 7.5,
         "cached_input_per_1m": 0.15
       }
     },
     "gpt-4o": {
       "provider": "openai",
-      "input_per_1m": 2.50,
-      "output_per_1m": 10.00,
+      "input_per_1m": 2.5,
+      "output_per_1m": 10.0,
       "cached_input_per_1m": 1.25
     },
     "gpt-4o-mini": {
       "provider": "openai",
       "input_per_1m": 0.15,
-      "output_per_1m": 0.60,
+      "output_per_1m": 0.6,
       "cached_input_per_1m": 0.075
     },
     "o1": {
       "provider": "openai",
-      "input_per_1m": 15.00,
-      "output_per_1m": 60.00,
-      "cached_input_per_1m": 7.50
+      "input_per_1m": 15.0,
+      "output_per_1m": 60.0,
+      "cached_input_per_1m": 7.5
     },
     "o1-mini": {
       "provider": "openai",
-      "input_per_1m": 1.10,
-      "output_per_1m": 4.40,
+      "input_per_1m": 1.1,
+      "output_per_1m": 4.4,
       "cached_input_per_1m": 0.55
     },
     "o3-mini": {
       "provider": "openai",
-      "input_per_1m": 1.10,
-      "output_per_1m": 4.40,
+      "input_per_1m": 1.1,
+      "output_per_1m": 4.4,
       "cached_input_per_1m": 0.55
     },
     "claude-3-7-sonnet": {
       "provider": "anthropic",
-      "input_per_1m": 3.00,
-      "output_per_1m": 15.00,
-      "cached_input_per_1m": 0.30
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3
     },
     "claude-3-5-sonnet": {
       "provider": "anthropic",
-      "input_per_1m": 3.00,
-      "output_per_1m": 15.00,
-      "cached_input_per_1m": 0.30
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3
     },
     "claude-3-5-haiku": {
       "provider": "anthropic",
-      "input_per_1m": 0.80,
-      "output_per_1m": 4.00,
+      "input_per_1m": 0.8,
+      "output_per_1m": 4.0,
       "cached_input_per_1m": 0.08
     },
     "claude-3-opus": {
       "provider": "anthropic",
-      "input_per_1m": 15.00,
-      "output_per_1m": 75.00,
-      "cached_input_per_1m": 1.50
+      "input_per_1m": 15.0,
+      "output_per_1m": 75.0,
+      "cached_input_per_1m": 1.5
     },
     "deepseek-v3": {
       "provider": "deepseek",
@@ -300,6 +301,51 @@
       "input_per_1m": 0.55,
       "output_per_1m": 2.19,
       "cached_input_per_1m": 0.14
+    },
+    "gpt-4.1": {
+      "provider": "openai",
+      "input_per_1m": 2.0,
+      "output_per_1m": 8.0,
+      "cached_input_per_1m": 0.5
+    },
+    "gpt-4.1-mini": {
+      "provider": "openai",
+      "input_per_1m": 0.4,
+      "output_per_1m": 1.6,
+      "cached_input_per_1m": 0.1
+    },
+    "gpt-4.1-nano": {
+      "provider": "openai",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.025
+    },
+    "o3": {
+      "provider": "openai",
+      "input_per_1m": 2.0,
+      "output_per_1m": 8.0,
+      "cached_input_per_1m": 0.5
+    },
+    "o4-mini": {
+      "provider": "openai",
+      "input_per_1m": 1.1,
+      "output_per_1m": 4.4,
+      "cached_input_per_1m": 0.275
+    },
+    "claude-sonnet-4": {
+      "provider": "anthropic",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3,
+      "input_per_1m_gt_200k": 6.0,
+      "output_per_1m_gt_200k": 22.5,
+      "cached_input_per_1m_gt_200k": 0.6
+    },
+    "claude-opus-4": {
+      "provider": "anthropic",
+      "input_per_1m": 15.0,
+      "output_per_1m": 75.0,
+      "cached_input_per_1m": 1.5
     }
   },
   "tools": {
@@ -316,8 +362,8 @@
   },
   "fallback": {
     "provider": "unknown",
-    "input_per_1m": 0.30,
-    "output_per_1m": 2.50,
+    "input_per_1m": 0.3,
+    "output_per_1m": 2.5,
     "cached_input_per_1m": 0.03
   }
 }
