@@ -1421,10 +1421,23 @@ def generate_finops_report(
     )
     all_rows = telemetry.get("rows", [])
 
+    # If a session has 'session'-scope rows, exclude its 'turn'-scope rows to prevent double-counting
+    sessions_with_session_scope = {
+        r.get("session_id") for r in all_rows if r.get("scope") == "session" and r.get("session_id")
+    }
+    scope_deduped = [
+        r
+        for r in all_rows
+        if not (r.get("scope") == "turn" and r.get("session_id") in sessions_with_session_scope)
+    ]
+
     # Apply optional filters
     filtered: list[dict[str, Any]] = []
-    for r in all_rows:
-        if root_agent_filter and (r.get("root_agent_name") or "") != root_agent_filter:
+    for r in scope_deduped:
+        if root_agent_name := (r.get("root_agent_name") or ""):
+            if root_agent_filter and root_agent_name != root_agent_filter:
+                continue
+        elif root_agent_filter:
             continue
         if agent_filter and (r.get("agent_name") or "") != agent_filter:
             continue
@@ -1438,11 +1451,16 @@ def generate_finops_report(
     rollup_rows = [r for r in filtered if r.get("agent_role") == "root_rollup" or not r.get("agent_name")]
     sub_agent_rows = [r for r in filtered if r.get("agent_role") in ("root_self", "sub_agent") and r.get("agent_name")]
 
-    # If filtering by a specific sub-agent, use sub_agent_rows as primary KPI base
-    kpi_base = sub_agent_rows if (agent_filter and not rollup_rows) else (rollup_rows or sub_agent_rows)
+    # Use sub_agent_rows when its total spend exceeds rollup_rows (e.g. when a generic session_id like 's1' is reused across different agents)
+    rollup_cost = sum(float(r.get("total_cost_usd", 0.0)) for r in rollup_rows)
+    sub_agent_cost = sum(float(r.get("total_cost_usd", 0.0)) for r in sub_agent_rows)
+    if (agent_filter and not rollup_rows) or (sub_agent_rows and sub_agent_cost > rollup_cost + 1e-6):
+        kpi_base = sub_agent_rows
+    else:
+        kpi_base = rollup_rows or sub_agent_rows
 
-    unique_sessions = {r.get("session_id") for r in kpi_base if r.get("session_id")}
-    failed_sessions = {r.get("session_id") for r in kpi_base if r.get("session_id") and r.get("is_failure")}
+    unique_sessions = {r.get("session_id") for r in (rollup_rows + sub_agent_rows) if r.get("session_id")}
+    failed_sessions = {r.get("session_id") for r in (rollup_rows + sub_agent_rows) if r.get("session_id") and r.get("is_failure")}
     success_sessions = unique_sessions - failed_sessions
 
     total_cost_usd = round(sum(float(r.get("total_cost_usd", 0.0)) for r in kpi_base), 6)
@@ -1491,9 +1509,10 @@ def generate_finops_report(
         entry["total_cost_usd"] = round(entry["total_cost_usd"] + float(r.get("total_cost_usd", 0.0)), 6)
         entry["savings_usd"] = round(entry["savings_usd"] + float(r.get("savings_usd", 0.0)), 6)
 
+    agent_denom_cost = sum(info["total_cost_usd"] for info in by_agent.values()) or total_cost_usd
     agent_list: list[dict[str, Any]] = []
     for a_name, info in sorted(by_agent.items(), key=lambda x: x[1]["total_cost_usd"], reverse=True):
-        pct = round((info["total_cost_usd"] / total_cost_usd) * 100.0, 1) if total_cost_usd > 0 else 0.0
+        pct = round((info["total_cost_usd"] / agent_denom_cost) * 100.0, 1) if agent_denom_cost > 0 else 0.0
         agent_list.append(
             {
                 "agent_name": a_name,
