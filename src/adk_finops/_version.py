@@ -19,4 +19,4 @@ try:
     __version__ = _get_version("adk-finops")
 except Exception:
     # Fallback when running from an uninstalled source tree
-    __version__ = "1.0.1"
+    __version__ = "1.0.2"
