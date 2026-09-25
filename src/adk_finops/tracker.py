@@ -1315,5 +1315,13 @@ class CostTracker:
         cls.start_run(run_id)
         try:
             yield cls._active_runs.get(run_id, {})
-        finally:
-            pass
+        except Exception as e:
+            err_status = "budget_exceeded" if isinstance(e, BudgetExceededError) else "error"
+            err_msg = str(e) if isinstance(e, BudgetExceededError) else f"{type(e).__name__}: {e}"
+            cls.record_task_status(
+                session_id=run_id,
+                run_id=run_id,
+                status=err_status,
+                error=err_msg,
+            )
+            raise

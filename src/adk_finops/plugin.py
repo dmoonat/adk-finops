@@ -885,6 +885,97 @@ class FinOpsCostPlugin(BasePlugin):
                         blocking=False,
                     )
                 self._exported_sessions.add(session_id)
+                self._exported_sessions.add((session_id, str(task_status or "success").lower()))
+
+    async def on_model_error_callback(
+        self,
+        *,
+        callback_context: CallbackContext,
+        llm_request: LlmRequest,
+        error: Exception,
+    ) -> LlmResponse | None:
+        """Captures unhandled LLM model execution errors and marks the turn/session as error."""
+        turn_id, session_id = self._extract_ids(callback_context)
+        err_status = "budget_exceeded" if isinstance(error, BudgetExceededError) else "error"
+        err_msg = str(error) if isinstance(error, BudgetExceededError) else f"{type(error).__name__}: {error}"
+        CostTracker.record_task_status(
+            session_id=session_id,
+            run_id=turn_id,
+            status=err_status,
+            error=err_msg,
+        )
+        return None
+
+    async def on_tool_error_callback(
+        self,
+        *,
+        tool: BaseTool,
+        tool_args: dict[str, Any],
+        tool_context: ToolContext,
+        error: Exception,
+    ) -> dict[str, Any] | None:
+        """Captures unhandled tool execution errors.
+
+        Respects `@billable(charge_on_error=True)` if configured; otherwise skips charging
+        and records the error reason if the run later aborts.
+        """
+        from .billable import extract_billable_spec
+
+        turn_id, session_id = self._extract_ids(tool_context)
+        agent_name = self._extract_agent_name(tool_context)
+        tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "tool")
+        billable_spec = extract_billable_spec(tool)
+        if billable_spec is not None and billable_spec.charge_on_error:
+            computed_fee = billable_spec.compute_fee(tool_args=tool_args, result=error)
+            if computed_fee > 0.0:
+                tool_type = (billable_spec.tool_name or tool_name).strip().lower()
+                CostTracker.record_tool_call(
+                    run_id=turn_id,
+                    session_id=session_id,
+                    tool_name=tool_type,
+                    count=1,
+                    task_name=tool_name,
+                    custom_cost_usd=computed_fee,
+                    agent_name=agent_name,
+                    provider=billable_spec.provider,
+                )
+        return None
+
+    async def on_agent_error_callback(
+        self,
+        *,
+        agent: BaseAgent,
+        callback_context: CallbackContext,
+        error: Exception,
+    ) -> None:
+        """Captures unhandled exceptions escaping an ADK agent."""
+        turn_id, session_id = self._extract_ids(callback_context)
+        err_status = "budget_exceeded" if isinstance(error, BudgetExceededError) else "error"
+        err_msg = str(error) if isinstance(error, BudgetExceededError) else f"{type(error).__name__}: {error}"
+        CostTracker.record_task_status(
+            session_id=session_id,
+            run_id=turn_id,
+            status=err_status,
+            error=err_msg,
+        )
+
+    async def on_run_error_callback(
+        self,
+        *,
+        invocation_context: InvocationContext,
+        error: Exception,
+    ) -> None:
+        """Automatically records wasted spend and flushes telemetry when an unhandled exception escapes the ADK Runner."""
+        turn_id, session_id = self._extract_ids(invocation_context)
+        err_status = "budget_exceeded" if isinstance(error, BudgetExceededError) else "error"
+        err_msg = str(error) if isinstance(error, BudgetExceededError) else f"{type(error).__name__}: {error}"
+        self.record_task_status(
+            session_id=session_id,
+            run_id=turn_id,
+            status=err_status,
+            error=err_msg,
+            auto_export=True,
+        )
 
     def export_session(
         self,
@@ -929,6 +1020,7 @@ class FinOpsCostPlugin(BasePlugin):
                 blocking=blocking,
             )
         self._exported_sessions.add(session_id)
+        self._exported_sessions.add((session_id, str(task_status or "success").lower()))
 
     def record_task_status(
         self,
@@ -941,9 +1033,8 @@ class FinOpsCostPlugin(BasePlugin):
     ) -> dict[str, Any]:
         """Records task outcome (success vs failure) and updates efficiency metrics.
 
-        If `auto_export` is True and the session was not already exported (e.g. because
-        an exception prevented `after_run_callback` from executing), it automatically exports
-        the final record to all configured exporters (BigQuery, JSONL, CSV, OpenTelemetry).
+        If `auto_export` is True and the session with this status was not already exported,
+        it automatically exports the record to all configured exporters (BigQuery, JSONL, CSV, OpenTelemetry).
 
         Args:
             session_id: The session ID for the task.
@@ -960,8 +1051,13 @@ class FinOpsCostPlugin(BasePlugin):
             error=error,
         )
 
+        norm_status = str(status or "success").lower()
         should_export = export_to_bigquery if export_to_bigquery is not None else auto_export
-        if should_export and self.exporters and session_id not in self._exported_sessions:
+        already_exported = (
+            (session_id, norm_status) in self._exported_sessions
+            or (norm_status == "success" and session_id in self._exported_sessions)
+        )
+        if should_export and self.exporters and not already_exported:
             self.export_session(
                 session_id=session_id,
                 run_id=run_id,

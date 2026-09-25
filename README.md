@@ -72,7 +72,7 @@ Building production AI agents with Google ADK involves multi-step tool-calling l
 - **Dual-Scope Accounting**: Simultaneously tracks metrics for both the **active turn** (all calls within a user message) and the **cumulative session** (entire conversation history).
 - **Pre-Flight & Post-Call Budget Guards**: Estimate input tokens and projected cost in `before_model_callback` (`< 0.5ms`) using deterministic provider token profiles (`google`, `openai`, `anthropic`, `deepseek`). Block massive 200K+ token dumps (`max_prompt_tokens`) at `$0.00` cloud cost or automatically downgrade models (`gemini-2.5-pro` ➔ `gemini-2.5-flash`) in-place before the request leaves the process.
 - **Automated FinOps Optimization Advisor**: Zero-LLM, deterministic rule engine that analyzes completed session telemetry in `< 1ms` and calculates concrete `$` and `%` savings across **Context Caching Opportunities**, **Thinking Token Alerts** (`thinking_budget=0`), and **Model Right-Sizing** (`gemini-3.5-flash` ➔ `gemini-3.5-flash-lite`, `gemini-2.5-pro` ➔ `gemini-2.5-flash`, `gpt-4o` ➔ `gpt-4o-mini`). Easily toggled on/off via `enable_optimization_advisor=True/False`.
-- **Task Outcome & Wasted Spend Analytics**: Distinguishes productive spend (`status="success"`) from wasted capital burned on failed retry loops or runtime exceptions (`status="failed"`, `"error"`). Computes average spend per successful task vs. average wasted spend per failed loop, capital loss percentage, and auto-exports crashed sessions to BigQuery.
+- **Task Outcome & Wasted Spend Analytics**: Distinguishes productive spend (`status="success"`) from wasted capital burned on budget halts, failed retry loops, or silent semantic failures (`status="failed"`, `"error"`, `"budget_exceeded"`). Automatically captures budget circuit-breaker halts and `ctx.state["failed"] = True` workflow states; pairs with `record_task_status()` so teams can flag cleanly returning runs that fail business validation and auto-export crashed sessions to BigQuery.
 - **Context Caching Savings ROI**: Demonstrates financial value by tracking gross cost (cost without caching) vs. actual net cost, reporting exact dollars and percentage saved (e.g. up to 90% savings via Gemini Context Caching).
 - **Decoupled Rate Cards**: Pricing data is stored in clean JSON. Override rates via local file, remote URL, environment variable, or code without modifying the engine.
 - **Enterprise Volume Discounts**: Configure global or provider-specific discount multipliers (e.g., 15% Google Cloud negotiated discount).
@@ -290,9 +290,27 @@ CostTracker.register_token_profile("meta-llama", {"ascii_chars_per_token": 3.9, 
 
 ## Task Outcome & Wasted Spend Analytics (Success vs. Failure)
 
-In production AI systems, a failed agent loop (e.g., an agent repeatedly failing schema validation across 3 retries, or crashing due to a downstream API outage after generating a complex plan) often burns **5x–20x more tokens** than a successful task while delivering **zero business value**.
+In production AI systems, a failed agent loop (e.g., an agent repeatedly failing schema validation across 3 retries, returning a polite *"I couldn't find that"* after burning 5 tool calls, or crashing due to a downstream API outage after generating a complex plan) often burns **5x–20x more tokens** than a successful task while delivering **zero business value**.
 
 `adk-finops` tracks every LLM call in real time and classifies outcomes into **Productive Spend** vs. **Wasted Capital**, allowing teams to compare the average spend of a successful task against the wasted spend of failed loops.
+
+> [!IMPORTANT]
+> **Why "0% Wasted Spend" on Day 1 Doesn't Mean Zero Waste (Team Instrumentation Required)**
+>
+> `adk-finops` **automatically captures thrown exceptions** (`on_run_error_callback`, `on_agent_error_callback`, `on_model_error_callback`, `on_tool_error_callback`, and `CostTracker.track_run`) as well as **budget circuit-breaker halts** (`status="budget_exceeded"`).
+>
+> However, in production AI systems, the most expensive failure isn't a thrown exception—it's **the run that returns cleanly (`200 OK`) and lands nothing** (e.g., an agent gives up politely, produces an empty/invalid payload, or hallucinates without throwing a Python error).
+>
+> Because `adk-finops` is a zero-LLM observability plugin, **any run that finishes normally without throwing an exception or setting a failure flag defaults to `status="success"`**. Your Wasted Spend metric for semantic failures rides on your team's outcome discipline: if your workflow validators, critics, or post-run checks do not set `ctx.state["failed"] = True` or call `record_task_status(status="failed")`, your first dashboard chart will read `$0.00 (0%)` wasted spend whenever agents fail politely instead of throwing.
+
+### What Is Captured Automatically vs. What Requires Team Discipline
+
+| Failure Category | Example | Captured Automatically? | How It Works / How to Instrument |
+| :--- | :--- | :---: | :--- |
+| **Budget Circuit Breaker** | Run exceeds `budget_limit_usd` or `session_budget_usd` (`action="halt"`) | ✅ **Yes** (`status="budget_exceeded"`) | Built-in (`FinOpsCostPlugin` / `CostTracker.check_budget`) |
+| **Unhandled Python / Tool / Model Exception** | Downstream DB/API raises `ConnectionError`, tool crashes, or model call throws an exception | ✅ **Yes** (`status="error"`) | Built-in via ADK `on_run_error_callback`, `on_agent_error_callback`, `on_model_error_callback`, `on_tool_error_callback` (auto-exports crashed session to BigQuery/JSONL/CSV) and `CostTracker.track_run` |
+| **Workflow Critic / Validator State** | Graph node sets `ctx.state["failed"] = True` | ✅ **Yes** (`status="failed"`) | Built-in via `after_run_callback` inspecting `session.state` |
+| **Cleanly Returning Run That Lands Nothing *(Semantic / Silent Failure)*** | Agent finishes `200 OK` without throwing, but outputs *"Sorry, I cannot help"*, fails business validation, or produces no actionable artifact | ❌ **No** *(defaults to `"success"`)* | **Requires team discipline:** set `ctx.state["failed"] = True` inside a validator/critic node **or** call `finops_plugin.record_task_status(session_id, status="failed", error="...")` after verifying the output |
 
 ### Understanding `status` vs. `is_failure`
 
@@ -301,9 +319,9 @@ In production AI systems, a failed agent loop (e.g., an agent repeatedly failing
 | **`status`** | `str` | `"success"`, `"pending"`, `"failed"`, `"error"`, `"aborted"`, `"budget_exceeded"` | **Operational Root Cause**: Identifies *how* the task ended (e.g., validation loop exhausted `"failed"`, downstream tool crash `"error"`, or circuit breaker halt `"budget_exceeded"`). |
 | **`is_failure`** | `bool` | `True` or `False` | **Financial Bucket**: Binary flag (`True` when status is `failed`, `error`, `aborted`, or `budget_exceeded`) used to separate **Wasted Spend (`True`)** from **Productive Spend (`False`)**. |
 
-### 1. Automatic Workflow State Detection (Google ADK)
+### 1. Catching "Clean Return, Zero Value" Runs via Workflow State (`ctx.state["failed"]`)
 
-If any ADK workflow node or critic sets `ctx.state["failed"] = True` and `ctx.state["error_reason"] = "..."`, `FinOpsCostPlugin` automatically detects the failure in `after_run_callback`, tags the root cause, and marks the run's cost as wasted spend:
+If any ADK workflow node, output verifier, or critic sets `ctx.state["failed"] = True` and `ctx.state["error_reason"] = "..."`, `FinOpsCostPlugin` automatically detects the failure in `after_run_callback`, tags the root cause, and reclassifies the run's entire token spend as wasted capital:
 
 ```python
 def strict_validator(node_input, ctx):
@@ -315,18 +333,28 @@ def strict_validator(node_input, ctx):
         return Event(output="Aborted", actions=EventActions(route="abort"))
 ```
 
-### 2. Explicit Recording & Crash Recovery (Auto-Export to BigQuery)
+### 2. Explicit Post-Run Verification & Crash Recovery (`record_task_status`)
 
-When an unhandled exception crashes an agent run, ADK skips `after_run_callback`. Calling `finops_plugin.record_task_status()` inside your `except` block ensures the wasted tokens are logged and **automatically streamed to BigQuery**:
+When running standalone agents (without a graph critic node) or catching unhandled exceptions (where ADK skips `after_run_callback`), call `finops_plugin.record_task_status()` whenever your application-level check determines the run failed to land its objective or threw an exception. Calling `record_task_status()` also **immediately flushes the failed session to BigQuery and configured exporters**:
 
 ```python
 from adk_finops import CostTracker, print_summary, print_task_efficiency_summary
 
 try:
+    final_text = ""
     async for event in runner.run_async(user_id="u1", session_id=session_id, new_message=msg):
-        ...
+        if event.content and event.content.parts:
+            final_text += "".join(p.text or "" for p in event.content.parts)
+
+    # Catch the "returns cleanly and lands nothing" case:
+    if not is_valid_business_outcome(final_text):
+        finops_plugin.record_task_status(
+            session_id=session_id,
+            status="failed",
+            error="Agent returned cleanly (200 OK) but did not produce a valid resolution",
+        )
 except Exception as e:
-    # Logs error outcome AND automatically flushes the crashed session to BigQuery
+    # Logs thrown exception outcome AND automatically flushes the crashed session to BigQuery
     finops_plugin.record_task_status(
         session_id=session_id,
         status="error",
