@@ -39,6 +39,7 @@
   - [7. Dynamic Remote Rate Card Syncing & Google Cloud Pricing Extraction Framework](#7-dynamic-remote-rate-card-syncing--google-cloud-pricing-extraction-framework)
 - [Smart Tool Classification & Explicit Tool Billing (`@billable`)](#smart-tool-classification--explicit-tool-billing-billable)
 - [Gemini 2.5 & 3.x Thinking Tokens Billing](#gemini-25--3x-thinking-tokens-billing)
+- [End-to-End Latency, TTFT & Token Throughput](#end-to-end-latency-ttft--token-throughput)
 - [Standalone Usage (Without ADK)](#standalone-usage-without-adk)
 - [Configuration Reference](#configuration-reference)
 - [Built-In Model Rate Cards](#built-in-model-rate-cards)
@@ -896,38 +897,70 @@ Per Google Cloud pricing rules:
 
 ---
 
+## End-to-End Latency, TTFT & Token Throughput
+
+`adk-finops` tracks high-resolution monotonic wall-clock latency (`time.perf_counter_ns()`), streaming **Time-To-First-Token (TTFT)**, tool execution latency, and token throughput across **turn**, **session**, **model**, **agent**, and **tool** scopes:
+
+| Metric Key | Scope | Description |
+| :--- | :---: | :--- |
+| `latency_ms` | Turn / Session / Agent | Overall wall-clock duration in milliseconds (`turn_latency_ms` when available, otherwise `llm_latency_ms + tool_latency_ms`). |
+| `llm_latency_ms` | All Scopes | Cumulative time spent waiting on LLM API calls in milliseconds. |
+| `avg_llm_latency_ms` | All Scopes | Average LLM latency per model invocation in milliseconds. |
+| `p95_llm_latency_ms` | All Scopes | 95th percentile LLM latency across calls in milliseconds. |
+| `ttft_ms` / `avg_ttft_ms` | All Scopes | Streaming **Time-To-First-Token** (`before_model_callback` $\rightarrow$ first `partial=True` streaming chunk). |
+| `tool_latency_ms` | All Scopes | Cumulative tool / grounding execution time (`before_tool_callback` $\rightarrow$ `after_tool_callback`). |
+| `output_tokens_per_sec` | All Scopes | Output generation speed: `(completion_tokens + thoughts_tokens) / (llm_latency_ms / 1000)`. |
+| `total_tokens_per_sec` | All Scopes | Total processing throughput: `total_tokens / (llm_latency_ms / 1000)`. |
+
+### Automatic ADK Plugin Logging & Terminal Banner
+
+When using `FinOpsCostPlugin`, latency and throughput are captured automatically with zero configuration:
+```text
+[FinOps LLM] turn=e-6a9efc session=multi_ag agent=coordinator_agent model=gemini-3.1-pro-preview tokens=926 (prompt=428, completion=22, thoughts=476, cached=0) cost=$0.006832 | latency=6726.9ms throughput=74.0tok/s
+[FinOps Tool] turn=e-6a9efc session=multi_ag agent=research_agent tool=fetch_cloud_benchmarks fee=$0.015000 latency=0.2ms
+[FinOps Summary] Turn tokens=5042 cost=$0.049734 | Session tokens=5042 cost=$0.049734 | ⚡ turn_latency=26452.4ms throughput=93.5tok/s
+```
+And rendered in the Rich / Unicode terminal summary box and the Near-Live Web Dashboard (`adk-finops dashboard`):
+```text
+⚡ Latency & Throughput: Wall: 26.45s | LLM: 26.38s (avg 8.79s, p95 12.16s) | Tools: 0.4ms | Out: 93.5 tok/s | Total: 191.2 tok/s
+```
+
+---
+
 ## Standalone Usage (Without ADK)
 
-`adk-finops` is designed to be used in **any Python application** — FastAPI/Flask backends, Celery/Ray background pipelines, LangChain/LlamaIndex workflows, or raw Google GenAI SDK scripts — without requiring Google ADK.
-
+`adk-finops` is designed to be used in **any Python application** — FastAPI/Flask backends, Celery/Ray background pipelines, LangChain/LlamaIndex workflows, or raw Google GenAI / OpenAI / Anthropic SDK scripts — without requiring Google ADK.
 
 ```python
 from adk_finops import CostTracker, BigQueryExporter
 
-# Wrap any execution block with automatic lifecycle cleanup
+# 1. track_run() automatically measures end-to-end turn_latency_ms
 with CostTracker.track_run("request_123"):
-    # Record Gemini call with thoughts/reasoning tokens
-    CostTracker.record_usage(
-        run_id="request_123",
-        model_name="gemini-3.7-flash",
-        prompt_tokens=1500,
-        completion_tokens=250,
-        thoughts_tokens=100,
-        cached_tokens=0,
-    )
-    # Record grounding or tool fee ($0.014 / query)
-    CostTracker.record_tool_call(
-        run_id="request_123",
-        tool_name="google_search",
-    )
+    # 2. Option A: Context manager automatically times LLM latency (and streaming TTFT)
+    with CostTracker.track_llm_call("request_123", model_name="gemini-3.7-flash", agent_name="researcher") as call:
+        # Execute your SDK call (sync or async `async with CostTracker.track_llm_call(...)`)
+        # Optional for streaming: call.mark_first_token() on first chunk
+        call.record_usage(
+            prompt_tokens=1500,
+            completion_tokens=250,
+            thoughts_tokens=100,
+            cached_tokens=0,
+        )
 
-# Print color-coded terminal summary box
+    # 3. Option B: Time tool execution with track_tool_call() (or pass latency_ms=... directly)
+    with CostTracker.track_tool_call("request_123", tool_name="google_search", agent_name="researcher"):
+        pass  # Execute external tool / search API
+
+    # 4. Option C: If check_preflight_budget() is called before record_usage(),
+    #    CostTracker automatically computes the elapsed latency delta!
+
+# Print color-coded terminal summary box (includes Latency & Throughput columns)
 CostTracker.print_summary("request_123")
 
 # Get structured metrics dictionary
 summary = CostTracker.get_summary("request_123")
-print(f"Total Cost: ${summary['total_cost_usd']:.6f}")
-print(f"Total Tokens: {summary['total_tokens']}")
+print(f"Total Cost:  ${summary['total_cost_usd']:.6f}")
+print(f"Latency:     {summary['latency_ms']:.1f}ms (Out: {summary['output_tokens_per_sec']:.1f} tok/s)")
 
 # (Optional) Export to BigQuery in 1 line
 # exporter = BigQueryExporter("my-project.finops.agent_costs")
@@ -1084,6 +1117,12 @@ When `bigquery_table` is specified, `adk-finops` automatically inspects and prov
 | `savings_usd` | `FLOAT` | Dollars saved via context caching |
 | `savings_pct` | `FLOAT` | Percentage saved via context caching |
 | `tool_calls_count` | `INTEGER` | Number of billable grounding/tool calls |
+| `latency_ms` | `FLOAT` | Overall wall-clock latency in milliseconds |
+| `llm_latency_ms` | `FLOAT` | Cumulative LLM call latency in milliseconds |
+| `tool_latency_ms` | `FLOAT` | Cumulative tool execution latency in milliseconds |
+| `ttft_ms` | `FLOAT` | Streaming Time-To-First-Token (TTFT) in milliseconds |
+| `output_tokens_per_sec` | `FLOAT` | Output token generation speed (`tok/s`) |
+| `total_tokens_per_sec` | `FLOAT` | Total token processing throughput (`tok/s`) |
 | `budget_limit_usd` | `FLOAT` | Configured budget threshold |
 | `budget_utilization_pct` | `FLOAT` | Budget utilization percentage |
 | `budget_exceeded` | `BOOLEAN` | Whether budget guard was tripped |
@@ -1339,6 +1378,8 @@ When `enable_otel=True` (or `OpenTelemetryExporter` is used), `adk-finops` enric
 - `gen_ai.finops.breakdown_by_tool` (JSON-serialized `Agent -> Tool -> Calls & Cost` map)
 - `gen_ai.finops.task_outcome` (`success`, `failed`, `error`, `budget_exceeded`)
 - `gen_ai.finops.is_wasted_spend` (`true` / `false`)
+- `gen_ai.finops.latency_ms`, `gen_ai.finops.llm_latency_ms`, `gen_ai.finops.tool_latency_ms`, `gen_ai.finops.ttft_ms`
+- `gen_ai.finops.output_tokens_per_sec`, `gen_ai.finops.total_tokens_per_sec`
 
 #### 4. Standalone Exporter Usage (`BigQueryExporter`, `JSONLExporter`, `CSVExporter`, `OpenTelemetryExporter`)
 

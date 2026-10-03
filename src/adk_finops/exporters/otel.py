@@ -184,6 +184,12 @@ class OpenTelemetryExporter(BaseExporter):
             "gen_ai.finops.task_outcome": str(row.get("status") or "success"),
             "gen_ai.finops.is_wasted_spend": bool(row.get("is_failure", False)),
             "gen_ai.finops.budget_exceeded": bool(row.get("budget_exceeded", False)),
+            "gen_ai.finops.latency_ms": float(row.get("latency_ms", 0.0) or 0.0),
+            "gen_ai.finops.llm_latency_ms": float(row.get("llm_latency_ms", 0.0) or 0.0),
+            "gen_ai.finops.tool_latency_ms": float(row.get("tool_latency_ms", 0.0) or 0.0),
+            "gen_ai.finops.ttft_ms": float(row.get("ttft_ms", 0.0) or 0.0),
+            "gen_ai.finops.output_tokens_per_sec": float(row.get("output_tokens_per_sec", 0.0) or 0.0),
+            "gen_ai.finops.total_tokens_per_sec": float(row.get("total_tokens_per_sec", 0.0) or 0.0),
             # OpenInference semantic conventions (for Arize Phoenix native Cost & Token UI columns)
             "openinference.span.kind": "LLM" if row.get("agent_name") else "CHAIN",
             "llm.token_count.prompt": prompt_tok,

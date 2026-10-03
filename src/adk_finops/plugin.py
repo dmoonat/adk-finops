@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -196,6 +197,10 @@ class FinOpsCostPlugin(BasePlugin):
         self.exporters: list[Any] = list(exporters) if exporters else []
         self._exported_sessions: set[str] = set()
         self._last_partial_usage: dict[str, tuple[Any, str | None]] = {}
+        self._model_start_ns: dict[str, int] = {}
+        self._model_ttft_ms: dict[str, float] = {}
+        self._tool_start_ns: dict[str, int] = {}
+        self._run_start_ns: dict[str, int] = {}
 
         if self.bigquery_table:
             from .exporters.bigquery import BigQueryExporter
@@ -364,6 +369,54 @@ class FinOpsCostPlugin(BasePlugin):
 
         return "root_agent"
 
+    @staticmethod
+    def _record_bounded_ts(store: dict[str, Any], key: str, value: Any, max_size: int = 5_000) -> None:
+        """Inserts a timestamp/value into a bounded dictionary to prevent memory leaks."""
+        while len(store) >= max_size and key not in store:
+            oldest = next(iter(store))
+            store.pop(oldest, None)
+        store[key] = value
+
+    def _pop_tool_latency_ms(
+        self,
+        turn_id: str,
+        agent_name: str,
+        tool_name: str,
+        session_id: str | None = None,
+    ) -> float | None:
+        """Pops the tool start timestamp and records elapsed tool latency in milliseconds."""
+        clean_tool = (tool_name or "tool").strip().lower()
+        t_key = f"{turn_id}:{agent_name}:{clean_tool}"
+        start_ns = self._tool_start_ns.pop(t_key, None)
+        if start_ns is None:
+            return None
+        elapsed_ms = round(max(0.0, (time.perf_counter_ns() - int(start_ns)) / 1_000_000.0), 2)
+        if elapsed_ms > 0:
+            CostTracker.record_tool_latency(
+                run_id=turn_id,
+                session_id=session_id,
+                agent_name=agent_name,
+                tool_name=clean_tool,
+                latency_ms=elapsed_ms,
+            )
+        return elapsed_ms
+
+    async def before_tool_callback(
+        self,
+        *,
+        tool: BaseTool,
+        tool_args: dict[str, Any],
+        tool_context: ToolContext,
+    ) -> dict[str, Any] | None:
+        """Records tool start timestamp to measure tool execution latency."""
+        turn_id, _ = self._extract_ids(tool_context)
+        agent_name = self._extract_agent_name(tool_context)
+        tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "tool")
+        clean_tool = (tool_name or "tool").strip().lower()
+        t_key = f"{turn_id}:{agent_name}:{clean_tool}"
+        self._record_bounded_ts(self._tool_start_ns, t_key, time.perf_counter_ns())
+        return None
+
     async def before_run_callback(
         self, *, invocation_context: InvocationContext
     ) -> types.Content | None:
@@ -375,6 +428,7 @@ class FinOpsCostPlugin(BasePlugin):
         turn_id, session_id = self._extract_ids(invocation_context)
         root_name = self._register_agent_tree(getattr(invocation_context, "agent", None))
         CostTracker.start_turn(turn_id=turn_id, session_id=session_id, root_agent_name=root_name)
+        self._record_bounded_ts(self._run_start_ns, turn_id, time.perf_counter_ns())
         msg = f"[FinOps] Initialized cost tracking: turn={turn_id[:8]} session={session_id[:8]}"
         print(msg, flush=True)
         logger.info(msg)
@@ -419,6 +473,9 @@ class FinOpsCostPlugin(BasePlugin):
 
         turn_id, session_id = self._extract_ids(callback_context)
         agent_name = self._extract_agent_name(callback_context)
+        m_key = f"{turn_id}:{agent_name}"
+        self._record_bounded_ts(self._model_start_ns, m_key, time.perf_counter_ns())
+        self._model_ttft_ms.pop(m_key, None)
         target_model = (
             getattr(llm_request, "model", None)
             or getattr(getattr(callback_context, "agent", None), "model", None)
@@ -541,11 +598,23 @@ class FinOpsCostPlugin(BasePlugin):
         # followed by one final aggregated LlmResponse (partial == False / None).
         # Skip partial chunks so a streamed model call is recorded only once.
         if getattr(llm_response, "partial", None) is True:
+            if partial_key not in self._model_ttft_ms and partial_key in self._model_start_ns:
+                ttft_val = round(
+                    max(0.0, (time.perf_counter_ns() - int(self._model_start_ns[partial_key])) / 1_000_000.0), 2
+                )
+                self._record_bounded_ts(self._model_ttft_ms, partial_key, ttft_val)
             if usage is not None:
                 self._last_partial_usage[partial_key] = (usage, model_version)
             return None
 
         partial_fallback = self._last_partial_usage.pop(partial_key, None)
+        start_ns = self._model_start_ns.pop(partial_key, None)
+        ttft_ms = self._model_ttft_ms.pop(partial_key, None)
+        llm_latency_ms = (
+            round(max(0.0, (time.perf_counter_ns() - int(start_ns)) / 1_000_000.0), 2)
+            if start_ns is not None
+            else None
+        )
         if usage is None and partial_fallback is not None:
             usage, fallback_model_ver = partial_fallback
             if not model_version:
@@ -565,6 +634,8 @@ class FinOpsCostPlugin(BasePlugin):
                 model_name=model_name,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
+                latency_ms=llm_latency_ms,
+                ttft_ms=ttft_ms,
                 thoughts_tokens=thoughts_tokens,
                 cached_tokens=cached_tokens,
                 task_name=agent_name,
@@ -587,8 +658,25 @@ class FinOpsCostPlugin(BasePlugin):
                     current_span.set_attribute("gen_ai.finops.savings_pct", float(record.get("savings_pct", 0.0)))
                     current_span.set_attribute("gen_ai.usage.thoughts_tokens", int(thoughts_tokens))
                     current_span.set_attribute("gen_ai.usage.cached_tokens", int(cached_tokens))
+                    if record.get("latency_ms", 0.0) > 0:
+                        current_span.set_attribute("gen_ai.finops.llm_latency_ms", float(record["latency_ms"]))
+                    if record.get("ttft_ms", 0.0) > 0:
+                        current_span.set_attribute("gen_ai.finops.ttft_ms", float(record["ttft_ms"]))
+                    if record.get("output_tokens_per_sec", 0.0) > 0:
+                        current_span.set_attribute(
+                            "gen_ai.finops.output_tokens_per_sec", float(record["output_tokens_per_sec"])
+                        )
             except Exception:
                 pass
+
+            perf_parts: list[str] = []
+            if record.get("latency_ms", 0.0) > 0:
+                perf_parts.append(f"latency={record['latency_ms']:.1f}ms")
+            if record.get("ttft_ms", 0.0) > 0:
+                perf_parts.append(f"ttft={record['ttft_ms']:.1f}ms")
+            if record.get("output_tokens_per_sec", 0.0) > 0:
+                perf_parts.append(f"throughput={record['output_tokens_per_sec']:.1f}tok/s")
+            perf_str = (" | " + " ".join(perf_parts)) if perf_parts else ""
 
             fallback_str = (
                 " | ⚠️ [FALLBACK RATE - register via CostTracker.register_rate_card()]"
@@ -598,7 +686,7 @@ class FinOpsCostPlugin(BasePlugin):
             msg = (
                 f"[FinOps LLM] turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} model={model_name} "
                 f"tokens={record.get('total_tokens')} (prompt={prompt_tokens}, completion={completion_tokens}, thoughts={thoughts_tokens}, cached={cached_tokens}) "
-                f"cost=${record.get('cost_usd', 0.0):.6f}{savings_str}{fallback_str}"
+                f"cost=${record.get('cost_usd', 0.0):.6f}{perf_str}{savings_str}{fallback_str}"
             )
             print(msg, flush=True)
             logger.info(msg)
@@ -663,6 +751,7 @@ class FinOpsCostPlugin(BasePlugin):
         turn_id, session_id = self._extract_ids(tool_context)
         agent_name = self._extract_agent_name(tool_context)
         tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "tool")
+        tool_latency_ms = self._pop_tool_latency_ms(turn_id, agent_name, tool_name, session_id=session_id)
         clean_name = tool_name.strip().lower()
         tool_class_name = tool.__class__.__name__.lower()
         tool_module = getattr(tool.__class__, "__module__", "").lower()
@@ -719,6 +808,8 @@ class FinOpsCostPlugin(BasePlugin):
                 count=1,
                 task_name=tool_name,
                 custom_cost_usd=custom_cost_usd,
+                latency_ms=tool_latency_ms,
+                update_run_latency=False,
                 agent_name=agent_name,
                 provider=provider,
             )
@@ -729,6 +820,8 @@ class FinOpsCostPlugin(BasePlugin):
                 if current_span and current_span.is_recording():
                     current_span.set_attribute("gen_ai.finops.tool_name", tool_name)
                     current_span.set_attribute("gen_ai.finops.tool_fee_usd", float(cost))
+                    if tool_latency_ms is not None and tool_latency_ms > 0:
+                        current_span.set_attribute("gen_ai.finops.tool_latency_ms", float(tool_latency_ms))
             except Exception:
                 pass
             is_grounding = tool_type in (
@@ -742,7 +835,8 @@ class FinOpsCostPlugin(BasePlugin):
                 "vertex_ai_search",
             )
             log_prefix = "[FinOps Grounding]" if is_grounding else "[FinOps Tool]"
-            msg = f"{log_prefix} turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}"
+            lat_str = f" latency={tool_latency_ms:.1f}ms" if (tool_latency_ms is not None and tool_latency_ms > 0) else ""
+            msg = f"{log_prefix} turn={turn_id[:8]} session={session_id[:8]} agent={agent_name} tool={tool_name} fee=${cost:.6f}{lat_str}"
             print(msg, flush=True)
             logger.info(msg)
 
@@ -758,6 +852,13 @@ class FinOpsCostPlugin(BasePlugin):
         prefix = f"{turn_id}:"
         for k in [k for k in self._last_partial_usage if k.startswith(prefix)]:
             usage, model_version = self._last_partial_usage.pop(k)
+            start_ns = self._model_start_ns.pop(k, None)
+            ttft_ms = self._model_ttft_ms.pop(k, None)
+            flushed_lat = (
+                round(max(0.0, (time.perf_counter_ns() - int(start_ns)) / 1_000_000.0), 2)
+                if start_ns is not None
+                else None
+            )
             agent_name = k[len(prefix) :] or "root_agent"
             CostTracker.record_usage(
                 run_id=turn_id,
@@ -765,11 +866,18 @@ class FinOpsCostPlugin(BasePlugin):
                 model_name=model_version or self.default_model,
                 prompt_tokens=getattr(usage, "prompt_token_count", 0) or 0,
                 completion_tokens=getattr(usage, "candidates_token_count", 0) or 0,
+                latency_ms=flushed_lat,
+                ttft_ms=ttft_ms,
                 thoughts_tokens=getattr(usage, "thoughts_token_count", 0) or 0,
                 cached_tokens=getattr(usage, "cached_content_token_count", 0) or 0,
                 task_name=agent_name,
                 agent_name=agent_name,
             )
+
+        run_start_ns = self._run_start_ns.pop(turn_id, None)
+        if run_start_ns is not None:
+            turn_lat_ms = round(max(0.0, (time.perf_counter_ns() - int(run_start_ns)) / 1_000_000.0), 2)
+            CostTracker.record_turn_latency(run_id=turn_id, session_id=session_id, latency_ms=turn_lat_ms)
 
         # Auto-detect task status from session state if set by workflow nodes/critics
         if hasattr(invocation_context, "session") and invocation_context.session:
@@ -827,9 +935,18 @@ class FinOpsCostPlugin(BasePlugin):
             if sess_info.get("savings_usd", 0.0) > 0:
                 savings_info = f" | 💰 Total Saved: ${sess_info['savings_usd']:.6f} ({sess_info.get('savings_pct', 0.0)}%) via Caching"
 
+            perf_info = ""
+            if turn_info.get("latency_ms", 0.0) > 0 or sess_info.get("output_tokens_per_sec", 0.0) > 0:
+                p_bits: list[str] = []
+                if turn_info.get("latency_ms", 0.0) > 0:
+                    p_bits.append(f"turn_latency={turn_info['latency_ms']:.1f}ms")
+                if sess_info.get("output_tokens_per_sec", 0.0) > 0:
+                    p_bits.append(f"throughput={sess_info['output_tokens_per_sec']:.1f}tok/s")
+                perf_info = " | ⚡ " + " ".join(p_bits)
+
             msg = (
                 f"[FinOps Summary] Turn tokens={turn_info.get('total_tokens', 0)} cost=${turn_info.get('total_cost_usd', 0.0):.6f} | "
-                f"Session tokens={sess_info.get('total_tokens', 0)} cost=${sess_info.get('total_cost_usd', 0.0):.6f}{savings_info}"
+                f"Session tokens={sess_info.get('total_tokens', 0)} cost=${sess_info.get('total_cost_usd', 0.0):.6f}{perf_info}{savings_info}"
             )
             print(msg, flush=True)
             logger.info(msg)
@@ -924,6 +1041,7 @@ class FinOpsCostPlugin(BasePlugin):
         turn_id, session_id = self._extract_ids(tool_context)
         agent_name = self._extract_agent_name(tool_context)
         tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "tool")
+        tool_latency_ms = self._pop_tool_latency_ms(turn_id, agent_name, tool_name, session_id=session_id)
         billable_spec = extract_billable_spec(tool)
         if billable_spec is not None and billable_spec.charge_on_error:
             computed_fee = billable_spec.compute_fee(tool_args=tool_args, result=error)
@@ -936,6 +1054,8 @@ class FinOpsCostPlugin(BasePlugin):
                     count=1,
                     task_name=tool_name,
                     custom_cost_usd=computed_fee,
+                    latency_ms=tool_latency_ms,
+                    update_run_latency=False,
                     agent_name=agent_name,
                     provider=billable_spec.provider,
                 )
@@ -967,6 +1087,10 @@ class FinOpsCostPlugin(BasePlugin):
     ) -> None:
         """Automatically records wasted spend and flushes telemetry when an unhandled exception escapes the ADK Runner."""
         turn_id, session_id = self._extract_ids(invocation_context)
+        run_start_ns = self._run_start_ns.pop(turn_id, None)
+        if run_start_ns is not None:
+            turn_lat_ms = round(max(0.0, (time.perf_counter_ns() - int(run_start_ns)) / 1_000_000.0), 2)
+            CostTracker.record_turn_latency(run_id=turn_id, session_id=session_id, latency_ms=turn_lat_ms)
         err_status = "budget_exceeded" if isinstance(error, BudgetExceededError) else "error"
         err_msg = str(error) if isinstance(error, BudgetExceededError) else f"{type(error).__name__}: {error}"
         self.record_task_status(

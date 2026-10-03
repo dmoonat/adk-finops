@@ -25,6 +25,7 @@ import test_bigquery_exporter
 import test_budget
 import test_display
 import test_exporters
+import test_latency_throughput
 import test_multi_agent
 import test_plugin
 import test_preflight_guard
@@ -49,6 +50,7 @@ modules = [
     test_exporters,
     test_preflight_guard,
     test_security,
+    test_latency_throughput,
 ]
 
 import contextlib

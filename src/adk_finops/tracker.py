@@ -26,12 +26,185 @@ import copy
 import logging
 import os
 import threading
+import time
 from collections.abc import Generator
 from typing import Any, ClassVar
 
 from .rate_card import ModelRate, RateCardRegistry
 
 logger = logging.getLogger("adk_finops.tracker")
+
+
+class _TrackedLLMCall:
+    """Context manager helper for measuring standalone LLM call latency, TTFT, and token throughput."""
+
+    def __init__(
+        self,
+        tracker_cls: Any,
+        run_id: str | None = None,
+        model_name: str = "gemini-2.5-flash",
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        task_name: str | None = None,
+    ) -> None:
+        self._tracker_cls = tracker_cls
+        self.run_id = run_id
+        self.model_name = model_name
+        self.session_id = session_id
+        self.agent_name = agent_name
+        self.task_name = task_name
+        self._start_ns: int = time.perf_counter_ns()
+        self._first_token_ns: int | None = None
+        self.ttft_ms: float | None = None
+        self.latency_ms: float = 0.0
+        self.prompt_tokens: int = 0
+        self.completion_tokens: int = 0
+        self.cached_tokens: int = 0
+        self.thoughts_tokens: int = 0
+        self._usage_set: bool = False
+        self.record: dict[str, Any] = {}
+
+    def mark_first_token(self) -> float:
+        """Marks the arrival of the first streamed token and returns TTFT in milliseconds."""
+        if self._first_token_ns is None:
+            self._first_token_ns = time.perf_counter_ns()
+            self.ttft_ms = round(max(0.0, (self._first_token_ns - self._start_ns) / 1_000_000.0), 2)
+        return self.ttft_ms or 0.0
+
+    def set_usage(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cached_tokens: int = 0,
+        thoughts_tokens: int = 0,
+        model_name: str | None = None,
+    ) -> None:
+        """Explicitly sets token counts for this LLM call."""
+        self.prompt_tokens = int(prompt_tokens or 0)
+        self.completion_tokens = int(completion_tokens or 0)
+        self.cached_tokens = int(cached_tokens or 0)
+        self.thoughts_tokens = int(thoughts_tokens or 0)
+        if model_name:
+            self.model_name = model_name
+        self._usage_set = True
+
+    def set_response(self, response: Any) -> None:
+        """Extracts token usage metadata from a Gemini, OpenAI, Anthropic, or dict response."""
+        if response is None:
+            return
+        if getattr(response, "partial", None) is True and self._first_token_ns is None:
+            self.mark_first_token()
+
+        model_ver = (
+            getattr(response, "model_version", None)
+            or getattr(response, "model", None)
+            or (response.get("model_version") or response.get("model") if isinstance(response, dict) else None)
+        )
+        if isinstance(model_ver, str) and model_ver.strip():
+            self.model_name = model_ver.strip()
+
+        usage = getattr(response, "usage_metadata", None) or getattr(response, "usage", None)
+        if usage is None and isinstance(response, dict):
+            usage = response.get("usage_metadata") or response.get("usage") or response
+
+        if usage is not None:
+            if isinstance(usage, dict):
+                p_tok = usage.get("prompt_token_count", usage.get("prompt_tokens", usage.get("input_tokens", 0)))
+                c_tok = usage.get("candidates_token_count", usage.get("completion_tokens", usage.get("output_tokens", 0)))
+                th_tok = usage.get("thoughts_token_count", usage.get("thoughts_tokens", usage.get("reasoning_tokens", 0)))
+                ca_tok = usage.get("cached_content_token_count", usage.get("cached_tokens", usage.get("cache_read_input_tokens", 0)))
+            else:
+                p_tok = (
+                    getattr(usage, "prompt_token_count", None)
+                    or getattr(usage, "prompt_tokens", None)
+                    or getattr(usage, "input_tokens", 0)
+                )
+                c_tok = (
+                    getattr(usage, "candidates_token_count", None)
+                    or getattr(usage, "completion_tokens", None)
+                    or getattr(usage, "output_tokens", 0)
+                )
+                th_tok = (
+                    getattr(usage, "thoughts_token_count", None)
+                    or getattr(usage, "thoughts_tokens", None)
+                    or getattr(usage, "reasoning_tokens", 0)
+                )
+                ca_tok = (
+                    getattr(usage, "cached_content_token_count", None)
+                    or getattr(usage, "cached_tokens", None)
+                    or getattr(usage, "cache_read_input_tokens", 0)
+                )
+            self.prompt_tokens = int(p_tok or 0)
+            self.completion_tokens = int(c_tok or 0)
+            self.thoughts_tokens = int(th_tok or 0)
+            self.cached_tokens = int(ca_tok or 0)
+            self._usage_set = True
+
+    def _finalize(self) -> dict[str, Any]:
+        self.latency_ms = round(max(0.0, (time.perf_counter_ns() - self._start_ns) / 1_000_000.0), 2)
+        if self._usage_set:
+            self.record = self._tracker_cls.record_usage(
+                run_id=self.run_id,
+                session_id=self.session_id,
+                model_name=self.model_name,
+                prompt_tokens=self.prompt_tokens,
+                completion_tokens=self.completion_tokens,
+                cached_tokens=self.cached_tokens,
+                thoughts_tokens=self.thoughts_tokens,
+                latency_ms=self.latency_ms,
+                ttft_ms=self.ttft_ms,
+                task_name=self.task_name,
+                agent_name=self.agent_name,
+            )
+        return self.record
+
+
+class _TrackedToolCall:
+    """Context manager helper for measuring standalone tool execution latency and fee."""
+
+    def __init__(
+        self,
+        tracker_cls: Any,
+        run_id: str | None,
+        tool_name: str,
+        count: int = 1,
+        task_name: str | None = None,
+        custom_cost_usd: float | None = None,
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        provider: str | None = None,
+    ) -> None:
+        self._tracker_cls = tracker_cls
+        self.run_id = run_id
+        self.tool_name = tool_name
+        self.count = count
+        self.task_name = task_name
+        self.custom_cost_usd = custom_cost_usd
+        self.session_id = session_id
+        self.agent_name = agent_name
+        self.provider = provider
+        self._start_ns: int = time.perf_counter_ns()
+        self.latency_ms: float = 0.0
+        self.cost_usd: float = 0.0
+
+    def set_custom_cost(self, custom_cost_usd: float) -> None:
+        """Overrides the custom USD fee for this tool invocation."""
+        self.custom_cost_usd = float(custom_cost_usd)
+
+    def _finalize(self) -> float:
+        self.latency_ms = round(max(0.0, (time.perf_counter_ns() - self._start_ns) / 1_000_000.0), 2)
+        self.cost_usd = self._tracker_cls.record_tool_call(
+            run_id=self.run_id,
+            session_id=self.session_id,
+            tool_name=self.tool_name,
+            count=self.count,
+            task_name=self.task_name,
+            custom_cost_usd=self.custom_cost_usd,
+            agent_name=self.agent_name,
+            provider=self.provider,
+            latency_ms=self.latency_ms,
+        )
+        return self.cost_usd
 
 
 class BudgetExceededError(Exception):
@@ -579,6 +752,11 @@ class CostTracker:
             "budget_limit_usd": session_limit or turn_limit,
             "utilization_pct": utilization,
         }
+        now_ns = time.perf_counter_ns()
+        with cls._lock:
+            for tid in (run_id, session_id):
+                if tid and tid in cls._active_runs:
+                    cls._active_runs[tid]["_preflight_ts_ns"] = now_ns
         return False, None, status
 
     @classmethod
@@ -607,6 +785,339 @@ class CostTracker:
                 run["preflight_avoided_cost_usd"] = round(
                     run.get("preflight_avoided_cost_usd", 0.0) + max(0.0, float(avoided_cost_usd)), 7
                 )
+
+    @staticmethod
+    def _compute_percentile_ms(values: list[float], percentile: float = 95.0) -> float:
+        """Computes a percentile (e.g. P95) from a list of millisecond latency samples."""
+        if not values:
+            return 0.0
+        sorted_vals = sorted(float(v) for v in values)
+        if len(sorted_vals) == 1:
+            return round(sorted_vals[0], 2)
+        idx = (percentile / 100.0) * (len(sorted_vals) - 1)
+        lower = int(idx)
+        upper = min(lower + 1, len(sorted_vals) - 1)
+        weight = idx - lower
+        val = sorted_vals[lower] * (1.0 - weight) + sorted_vals[upper] * weight
+        return round(val, 2)
+
+    @classmethod
+    def _strip_internal_latency_keys(cls, data: dict[str, Any]) -> None:
+        """Removes internal timing buffers before returning or exporting summaries."""
+        for k in (
+            "_start_ts_ns",
+            "_preflight_ts_ns",
+            "_llm_latencies_ms",
+            "_ttft_latencies_ms",
+            "_timed_output_tokens",
+            "_timed_total_tokens",
+        ):
+            data.pop(k, None)
+        for bd_key in ("breakdown_by_model", "breakdown_by_agent"):
+            bd = data.get(bd_key)
+            if isinstance(bd, dict):
+                for item in bd.values():
+                    if isinstance(item, dict):
+                        for k in (
+                            "_llm_latencies_ms",
+                            "_ttft_latencies_ms",
+                            "_timed_output_tokens",
+                            "_timed_total_tokens",
+                        ):
+                            item.pop(k, None)
+
+    @classmethod
+    def _apply_llm_latency_to_run(
+        cls,
+        run: dict[str, Any],
+        model_name: str,
+        completion_tokens: int,
+        thoughts_tokens: int,
+        total_tokens: int,
+        latency_ms: float | None,
+        ttft_ms: float | None,
+        agent_name: str | None = None,
+    ) -> None:
+        """Updates run, model, and agent latency, TTFT, and token throughput metrics."""
+        eff_lat = round(float(latency_ms), 2) if (latency_ms is not None and latency_ms > 0) else 0.0
+        eff_ttft = round(float(ttft_ms), 2) if (ttft_ms is not None and ttft_ms > 0) else 0.0
+        out_tokens = int(completion_tokens or 0) + int(thoughts_tokens or 0)
+
+        if eff_lat > 0:
+            run["llm_latency_ms"] = round(run.get("llm_latency_ms", 0.0) + eff_lat, 2)
+            lats = run.setdefault("_llm_latencies_ms", [])
+            if len(lats) >= 1_000:
+                lats.pop(0)
+            lats.append(eff_lat)
+            run["avg_llm_latency_ms"] = round(sum(lats) / len(lats), 2)
+            run["p95_llm_latency_ms"] = cls._compute_percentile_ms(lats, 95.0)
+            run["_timed_output_tokens"] = run.get("_timed_output_tokens", 0) + out_tokens
+            run["_timed_total_tokens"] = run.get("_timed_total_tokens", 0) + int(total_tokens or 0)
+            llm_sec = run["llm_latency_ms"] / 1000.0
+            if llm_sec > 0:
+                run["output_tokens_per_sec"] = round(run["_timed_output_tokens"] / llm_sec, 2)
+                run["total_tokens_per_sec"] = round(run["_timed_total_tokens"] / llm_sec, 2)
+            if run.get("turn_latency_ms", 0.0) <= 0:
+                run["latency_ms"] = round(
+                    run.get("llm_latency_ms", 0.0) + run.get("tool_latency_ms", 0.0), 2
+                )
+
+        if eff_ttft > 0:
+            run["ttft_ms"] = eff_ttft
+            ttfts = run.setdefault("_ttft_latencies_ms", [])
+            if len(ttfts) >= 1_000:
+                ttfts.pop(0)
+            ttfts.append(eff_ttft)
+            run["avg_ttft_ms"] = round(sum(ttfts) / len(ttfts), 2)
+
+        m = run.get("breakdown_by_model", {}).get(model_name)
+        if isinstance(m, dict):
+            m.setdefault("llm_latency_ms", 0.0)
+            m.setdefault("avg_llm_latency_ms", 0.0)
+            m.setdefault("p95_llm_latency_ms", 0.0)
+            m.setdefault("ttft_ms", 0.0)
+            m.setdefault("avg_ttft_ms", 0.0)
+            m.setdefault("output_tokens_per_sec", 0.0)
+            m.setdefault("total_tokens_per_sec", 0.0)
+            if eff_lat > 0:
+                m["llm_latency_ms"] = round(m.get("llm_latency_ms", 0.0) + eff_lat, 2)
+                m_lats = m.setdefault("_llm_latencies_ms", [])
+                if len(m_lats) >= 1_000:
+                    m_lats.pop(0)
+                m_lats.append(eff_lat)
+                m["avg_llm_latency_ms"] = round(sum(m_lats) / len(m_lats), 2)
+                m["p95_llm_latency_ms"] = cls._compute_percentile_ms(m_lats, 95.0)
+                m["_timed_output_tokens"] = m.get("_timed_output_tokens", 0) + out_tokens
+                m["_timed_total_tokens"] = m.get("_timed_total_tokens", 0) + int(total_tokens or 0)
+                m_sec = m["llm_latency_ms"] / 1000.0
+                if m_sec > 0:
+                    m["output_tokens_per_sec"] = round(m["_timed_output_tokens"] / m_sec, 2)
+                    m["total_tokens_per_sec"] = round(m["_timed_total_tokens"] / m_sec, 2)
+            if eff_ttft > 0:
+                m["ttft_ms"] = eff_ttft
+                m_ttfts = m.setdefault("_ttft_latencies_ms", [])
+                if len(m_ttfts) >= 1_000:
+                    m_ttfts.pop(0)
+                m_ttfts.append(eff_ttft)
+                m["avg_ttft_ms"] = round(sum(m_ttfts) / len(m_ttfts), 2)
+
+        if agent_name:
+            a = run.get("breakdown_by_agent", {}).get(agent_name)
+            if isinstance(a, dict):
+                a.setdefault("llm_latency_ms", 0.0)
+                a.setdefault("tool_latency_ms", 0.0)
+                a.setdefault("latency_ms", 0.0)
+                a.setdefault("avg_llm_latency_ms", 0.0)
+                a.setdefault("p95_llm_latency_ms", 0.0)
+                a.setdefault("ttft_ms", 0.0)
+                a.setdefault("avg_ttft_ms", 0.0)
+                a.setdefault("output_tokens_per_sec", 0.0)
+                a.setdefault("total_tokens_per_sec", 0.0)
+                if eff_lat > 0:
+                    a["llm_latency_ms"] = round(a.get("llm_latency_ms", 0.0) + eff_lat, 2)
+                    a["latency_ms"] = round(
+                        a.get("llm_latency_ms", 0.0) + a.get("tool_latency_ms", 0.0), 2
+                    )
+                    a_lats = a.setdefault("_llm_latencies_ms", [])
+                    if len(a_lats) >= 1_000:
+                        a_lats.pop(0)
+                    a_lats.append(eff_lat)
+                    a["avg_llm_latency_ms"] = round(sum(a_lats) / len(a_lats), 2)
+                    a["p95_llm_latency_ms"] = cls._compute_percentile_ms(a_lats, 95.0)
+                    a["_timed_output_tokens"] = a.get("_timed_output_tokens", 0) + out_tokens
+                    a["_timed_total_tokens"] = a.get("_timed_total_tokens", 0) + int(total_tokens or 0)
+                    a_sec = a["llm_latency_ms"] / 1000.0
+                    if a_sec > 0:
+                        a["output_tokens_per_sec"] = round(a["_timed_output_tokens"] / a_sec, 2)
+                        a["total_tokens_per_sec"] = round(a["_timed_total_tokens"] / a_sec, 2)
+                if eff_ttft > 0:
+                    a["ttft_ms"] = eff_ttft
+                    a_ttfts = a.setdefault("_ttft_latencies_ms", [])
+                    if len(a_ttfts) >= 1_000:
+                        a_ttfts.pop(0)
+                    a_ttfts.append(eff_ttft)
+                    a["avg_ttft_ms"] = round(sum(a_ttfts) / len(a_ttfts), 2)
+
+    @classmethod
+    def _apply_tool_latency_to_run(
+        cls,
+        run: dict[str, Any],
+        latency_ms: float | None,
+        task_name: str | None = None,
+        agent_name: str | None = None,
+        tool_name: str | None = None,
+        update_run_total: bool = True,
+    ) -> None:
+        """Updates tool execution latency across run, agent, and tool breakdowns."""
+        if latency_ms is None or latency_ms <= 0:
+            return
+        eff_lat = round(float(latency_ms), 2)
+        if update_run_total:
+            run["tool_latency_ms"] = round(run.get("tool_latency_ms", 0.0) + eff_lat, 2)
+            if run.get("turn_latency_ms", 0.0) <= 0:
+                run["latency_ms"] = round(
+                    run.get("llm_latency_ms", 0.0) + run.get("tool_latency_ms", 0.0), 2
+                )
+
+        eff_tool = (task_name or tool_name or "tool").strip()
+        eff_agent_key = (agent_name or run.get("root_agent_name") or "root_agent").strip()
+        tool_bd = run.get("breakdown_by_tool", {})
+        t_item = tool_bd.get(eff_agent_key, {}).get(eff_tool)
+        if isinstance(t_item, dict):
+            t_item["latency_ms"] = round(t_item.get("latency_ms", 0.0) + eff_lat, 2)
+            t_item["avg_latency_ms"] = round(
+                t_item["latency_ms"] / max(1, int(t_item.get("calls", 1))), 2
+            )
+
+        if agent_name:
+            a = run.get("breakdown_by_agent", {}).get(agent_name)
+            if isinstance(a, dict):
+                if update_run_total:
+                    a["tool_latency_ms"] = round(a.get("tool_latency_ms", 0.0) + eff_lat, 2)
+                    a["latency_ms"] = round(
+                        a.get("llm_latency_ms", 0.0) + a.get("tool_latency_ms", 0.0), 2
+                    )
+                a_tools = a.get("tools", {})
+                at_item = a_tools.get(eff_tool)
+                if isinstance(at_item, dict):
+                    at_item["latency_ms"] = round(at_item.get("latency_ms", 0.0) + eff_lat, 2)
+                    at_item["avg_latency_ms"] = round(
+                        at_item["latency_ms"] / max(1, int(at_item.get("calls", 1))), 2
+                    )
+                    a["breakdown_by_tool"] = {agent_name: copy.deepcopy(a_tools)}
+
+    @classmethod
+    def record_tool_latency(
+        cls,
+        run_id: str | None = None,
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        tool_name: str | None = None,
+        latency_ms: float | None = None,
+    ) -> float:
+        """Records tool execution latency onto the run and agent even for $0.00 / non-billable tools."""
+        if not cls._enabled or latency_ms is None or latency_ms <= 0:
+            return 0.0
+        eff_lat = round(float(latency_ms), 2)
+        effective_id = run_id or "default_session"
+        with cls._lock:
+            if effective_id not in cls._active_runs:
+                cls._active_runs[effective_id] = cls._create_empty_run(effective_id)
+            cls._apply_tool_latency_to_run(
+                cls._active_runs[effective_id],
+                latency_ms=eff_lat,
+                task_name=tool_name,
+                agent_name=agent_name,
+                tool_name=tool_name,
+                update_run_total=True,
+            )
+            if session_id and session_id != effective_id:
+                if session_id not in cls._active_runs:
+                    cls._active_runs[session_id] = cls._create_empty_run(session_id)
+                cls._apply_tool_latency_to_run(
+                    cls._active_runs[session_id],
+                    latency_ms=eff_lat,
+                    task_name=tool_name,
+                    agent_name=agent_name,
+                    tool_name=tool_name,
+                    update_run_total=True,
+                )
+        return eff_lat
+
+    @classmethod
+    def record_turn_latency(
+        cls,
+        run_id: str | None = None,
+        session_id: str | None = None,
+        latency_ms: float | None = None,
+    ) -> float:
+        """Records wall-clock turn/run latency in milliseconds.
+
+        If `latency_ms` is omitted, automatically measures elapsed time since `start_run` / `start_turn`.
+        """
+        if not cls._enabled:
+            return 0.0
+        effective_id = run_id or session_id or "default_session"
+        now_ns = time.perf_counter_ns()
+        with cls._lock:
+            if effective_id not in cls._active_runs:
+                cls._active_runs[effective_id] = cls._create_empty_run(effective_id)
+            turn_run = cls._active_runs[effective_id]
+            if latency_ms is not None and latency_ms >= 0:
+                eff_lat = round(float(latency_ms), 2)
+            else:
+                start_ns = turn_run.get("_start_ts_ns")
+                eff_lat = (
+                    round(max(0.0, (now_ns - int(start_ns)) / 1_000_000.0), 2)
+                    if start_ns is not None
+                    else 0.0
+                )
+            if eff_lat > 0:
+                turn_run["turn_latency_ms"] = eff_lat
+                turn_run["latency_ms"] = eff_lat
+                if session_id and session_id != effective_id:
+                    if session_id not in cls._active_runs:
+                        cls._active_runs[session_id] = cls._create_empty_run(session_id)
+                    sess_run = cls._active_runs[session_id]
+                    sess_run["turn_latency_ms"] = round(
+                        sess_run.get("turn_latency_ms", 0.0) + eff_lat, 2
+                    )
+                    sess_run["latency_ms"] = sess_run["turn_latency_ms"]
+            return eff_lat
+
+    @classmethod
+    @contextlib.contextmanager
+    def track_llm_call(
+        cls,
+        run_id: str | None = None,
+        model_name: str = "gemini-2.5-flash",
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        task_name: str | None = None,
+    ) -> Generator[_TrackedLLMCall, None, None]:
+        """Context manager to auto-measure LLM latency, streaming TTFT, and token throughput in standalone Python."""
+        call_ctx = _TrackedLLMCall(
+            tracker_cls=cls,
+            run_id=run_id,
+            model_name=model_name,
+            session_id=session_id,
+            agent_name=agent_name,
+            task_name=task_name,
+        )
+        try:
+            yield call_ctx
+        finally:
+            call_ctx._finalize()
+
+    @classmethod
+    @contextlib.contextmanager
+    def track_tool_call(
+        cls,
+        run_id: str | None,
+        tool_name: str,
+        count: int = 1,
+        task_name: str | None = None,
+        custom_cost_usd: float | None = None,
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        provider: str | None = None,
+    ) -> Generator[_TrackedToolCall, None, None]:
+        """Context manager to auto-measure tool execution latency and fee in standalone Python."""
+        tool_ctx = _TrackedToolCall(
+            tracker_cls=cls,
+            run_id=run_id,
+            tool_name=tool_name,
+            count=count,
+            task_name=task_name,
+            custom_cost_usd=custom_cost_usd,
+            session_id=session_id,
+            agent_name=agent_name,
+            provider=provider,
+        )
+        try:
+            yield tool_ctx
+        finally:
+            tool_ctx._finalize()
 
     @classmethod
     def calculate_call_cost(
@@ -694,6 +1205,17 @@ class CostTracker:
             "savings_usd": 0.0,
             "savings_pct": 0.0,
             "currency": "USD",
+            "latency_ms": 0.0,
+            "llm_latency_ms": 0.0,
+            "tool_latency_ms": 0.0,
+            "turn_latency_ms": 0.0,
+            "avg_llm_latency_ms": 0.0,
+            "p95_llm_latency_ms": 0.0,
+            "ttft_ms": 0.0,
+            "avg_ttft_ms": 0.0,
+            "output_tokens_per_sec": 0.0,
+            "total_tokens_per_sec": 0.0,
+            "_start_ts_ns": time.perf_counter_ns(),
             "breakdown_by_model": {},
             "breakdown_by_agent": {},
             "breakdown_by_tool": {},
@@ -941,6 +1463,8 @@ class CostTracker:
         completion_tokens: int,
         cached_tokens: int = 0,
         thoughts_tokens: int = 0,
+        latency_ms: float | None = None,
+        ttft_ms: float | None = None,
         task_name: str | None = None,
         session_id: str | None = None,
         agent_name: str | None = None,
@@ -983,6 +1507,22 @@ class CostTracker:
             if model_name in cls._active_runs[effective_id].get("breakdown_by_model", {}):
                 cls._active_runs[effective_id]["breakdown_by_model"][model_name]["is_fallback_rate"] = is_fallback_rate
 
+            eff_lat_ms: float | None = latency_ms
+            preflight_ns = cls._active_runs[effective_id].pop("_preflight_ts_ns", None)
+            if eff_lat_ms is None and preflight_ns is not None:
+                eff_lat_ms = round(max(0.0, (time.perf_counter_ns() - int(preflight_ns)) / 1_000_000.0), 2)
+
+            cls._apply_llm_latency_to_run(
+                cls._active_runs[effective_id],
+                model_name=model_name,
+                completion_tokens=completion_tokens,
+                thoughts_tokens=thoughts_tokens,
+                total_tokens=total_tokens,
+                latency_ms=eff_lat_ms,
+                ttft_ms=ttft_ms,
+                agent_name=agent_name,
+            )
+
             if session_id and session_id != effective_id:
                 if session_id not in cls._active_runs:
                     cls._active_runs[session_id] = cls._create_empty_run(session_id)
@@ -1003,7 +1543,26 @@ class CostTracker:
                 if model_name in cls._active_runs[session_id].get("breakdown_by_model", {}):
                     cls._active_runs[session_id]["breakdown_by_model"][model_name]["is_fallback_rate"] = is_fallback_rate
 
+                sess_pf_ns = cls._active_runs[session_id].pop("_preflight_ts_ns", None)
+                if eff_lat_ms is None and sess_pf_ns is not None:
+                    eff_lat_ms = round(max(0.0, (time.perf_counter_ns() - int(sess_pf_ns)) / 1_000_000.0), 2)
+
+                cls._apply_llm_latency_to_run(
+                    cls._active_runs[session_id],
+                    model_name=model_name,
+                    completion_tokens=completion_tokens,
+                    thoughts_tokens=thoughts_tokens,
+                    total_tokens=total_tokens,
+                    latency_ms=eff_lat_ms,
+                    ttft_ms=ttft_ms,
+                    agent_name=agent_name,
+                )
+
         savings_pct = round((savings / gross_cost) * 100, 1) if gross_cost > 0 else 0.0
+        clean_lat = round(float(eff_lat_ms), 2) if (eff_lat_ms is not None and eff_lat_ms > 0) else 0.0
+        clean_ttft = round(float(ttft_ms), 2) if (ttft_ms is not None and ttft_ms > 0) else 0.0
+        out_tps = round(total_output_tokens / (clean_lat / 1000.0), 2) if clean_lat > 0 else 0.0
+        tot_tps = round(total_tokens / (clean_lat / 1000.0), 2) if clean_lat > 0 else 0.0
         return {
             "model": model_name,
             "agent": agent_name,
@@ -1017,6 +1576,11 @@ class CostTracker:
             "savings_usd": savings,
             "savings_pct": savings_pct,
             "is_fallback_rate": is_fallback_rate,
+            "latency_ms": clean_lat,
+            "llm_latency_ms": clean_lat,
+            "ttft_ms": clean_ttft,
+            "output_tokens_per_sec": out_tps,
+            "total_tokens_per_sec": tot_tps,
         }
 
     @classmethod
@@ -1030,6 +1594,8 @@ class CostTracker:
         session_id: str | None = None,
         agent_name: str | None = None,
         provider: str | None = None,
+        latency_ms: float | None = None,
+        update_run_latency: bool = True,
     ) -> float:
         """Records fixed or dynamic fees for tools, web search, or grounding calls.
         If both run_id (turn) and session_id (session) are provided, records to both.
@@ -1058,6 +1624,14 @@ class CostTracker:
                 agent_name=agent_name,
                 tool_name=clean_tool,
             )
+            cls._apply_tool_latency_to_run(
+                cls._active_runs[effective_id],
+                latency_ms=latency_ms,
+                task_name=task_name,
+                agent_name=agent_name,
+                tool_name=clean_tool,
+                update_run_total=update_run_latency,
+            )
 
             if session_id and session_id != effective_id:
                 if session_id not in cls._active_runs:
@@ -1069,6 +1643,14 @@ class CostTracker:
                     task_name=task_name,
                     agent_name=agent_name,
                     tool_name=clean_tool,
+                )
+                cls._apply_tool_latency_to_run(
+                    cls._active_runs[session_id],
+                    latency_ms=latency_ms,
+                    task_name=task_name,
+                    agent_name=agent_name,
+                    tool_name=clean_tool,
+                    update_run_total=update_run_latency,
                 )
 
         return total_tool_fee
@@ -1243,6 +1825,9 @@ class CostTracker:
         result["status"] = session_dict.get("status", "pending")
         result["is_failure"] = session_dict.get("is_failure", False)
         result["error"] = session_dict.get("error")
+        cls._strip_internal_latency_keys(turn_dict)
+        cls._strip_internal_latency_keys(session_dict)
+        cls._strip_internal_latency_keys(result)
 
         # Evaluate budget status
         _, _, budget_status = cls.check_budget(run_id=effective_turn, session_id=effective_session)
@@ -1325,3 +1910,5 @@ class CostTracker:
                 error=err_msg,
             )
             raise
+        finally:
+            cls.record_turn_latency(run_id=run_id)

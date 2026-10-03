@@ -107,6 +107,12 @@ class BaseExporter(ABC):
             "tool_calls_count": int(
                 scope_data.get("total_tool_calls", scope_data.get("tool_calls", 0))
             ),
+            "latency_ms": float(scope_data.get("latency_ms", 0.0) or 0.0),
+            "llm_latency_ms": float(scope_data.get("llm_latency_ms", 0.0) or 0.0),
+            "tool_latency_ms": float(scope_data.get("tool_latency_ms", 0.0) or 0.0),
+            "ttft_ms": float(scope_data.get("avg_ttft_ms", scope_data.get("ttft_ms", 0.0)) or 0.0),
+            "output_tokens_per_sec": float(scope_data.get("output_tokens_per_sec", 0.0) or 0.0),
+            "total_tokens_per_sec": float(scope_data.get("total_tokens_per_sec", 0.0) or 0.0),
             "budget_limit_usd": float(b_limit) if b_limit is not None else None,
             "budget_utilization_pct": float(b_util) if b_util is not None else None,
             "budget_exceeded": b_exceeded,

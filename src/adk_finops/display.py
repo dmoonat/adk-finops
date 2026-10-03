@@ -55,6 +55,24 @@ def _format_usd(amount: float) -> str:
     return f"${amount:.4f}"
 
 
+def _format_latency(ms: float) -> str:
+    """Formats latency in milliseconds or seconds."""
+    if ms <= 0.0:
+        return "—"
+    if ms >= 1000.0:
+        return f"{ms / 1000.0:.2f}s"
+    if ms >= 10.0:
+        return f"{ms:.0f}ms"
+    return f"{ms:.1f}ms"
+
+
+def _format_tps(tps: float) -> str:
+    """Formats token throughput in tokens/sec."""
+    if tps <= 0.0:
+        return "—"
+    return f"{tps:.1f} tok/s"
+
+
 def _resolve_optimization_insights(
     summary: dict[str, Any],
     show_optimization_insights: bool | None = None,
@@ -142,6 +160,8 @@ def render_rich_summary(
     scope_table.add_column("Scope", style="bold white", no_wrap=True)
     scope_table.add_column("Calls", justify="right", no_wrap=True)
     scope_table.add_column("Tokens", justify="right", no_wrap=True)
+    scope_table.add_column("Latency", justify="right", no_wrap=True)
+    scope_table.add_column("Throughput", justify="right", no_wrap=True)
     scope_table.add_column("LLM Cost", justify="right", no_wrap=True)
     scope_table.add_column("Tool Fees", justify="right", no_wrap=True)
     scope_table.add_column("Total Cost", justify="right", style="bold yellow", no_wrap=True)
@@ -153,6 +173,8 @@ def render_rich_summary(
             "Current Turn",
             str(turn_info.get("total_calls", 0)),
             _format_tokens(turn_tok),
+            _format_latency(float(turn_info.get("latency_ms", 0.0) or 0.0)),
+            _format_tps(float(turn_info.get("output_tokens_per_sec", 0.0) or 0.0)),
             _format_usd(turn_info.get("llm_cost_usd", 0.0)),
             _format_usd(turn_info.get("tool_cost_usd", 0.0)),
             _format_usd(turn_info.get("total_cost_usd", 0.0)),
@@ -164,6 +186,8 @@ def render_rich_summary(
         "Session Total",
         str(sess_info.get("total_calls", 0)),
         _format_tokens(sess_tok),
+        _format_latency(float(sess_info.get("latency_ms", 0.0) or 0.0)),
+        _format_tps(float(sess_info.get("output_tokens_per_sec", 0.0) or 0.0)),
         _format_usd(sess_info.get("llm_cost_usd", 0.0)),
         _format_usd(sess_info.get("tool_cost_usd", 0.0)),
         _format_usd(sess_info.get("total_cost_usd", 0.0)),
@@ -200,6 +224,37 @@ def render_rich_summary(
         caching_text.append(f"{_format_usd(savings_usd)} saved ", style="bold underline green")
         caching_text.append(f"({savings_pct:.1f}% reduction from {_format_usd(gross_usd)} gross)", style="green")
         render_items.append(caching_text)
+
+    # --- 2b. Latency & Token Throughput Banner ---
+    sess_lat_ms = float(sess_info.get("latency_ms", 0.0) or 0.0)
+    llm_lat_ms = float(sess_info.get("llm_latency_ms", 0.0) or 0.0)
+    tool_lat_ms = float(sess_info.get("tool_latency_ms", 0.0) or 0.0)
+    avg_llm_ms = float(sess_info.get("avg_llm_latency_ms", 0.0) or 0.0)
+    p95_llm_ms = float(sess_info.get("p95_llm_latency_ms", 0.0) or 0.0)
+    avg_ttft_ms = float(sess_info.get("avg_ttft_ms", sess_info.get("ttft_ms", 0.0)) or 0.0)
+    out_tps = float(sess_info.get("output_tokens_per_sec", 0.0) or 0.0)
+    tot_tps = float(sess_info.get("total_tokens_per_sec", 0.0) or 0.0)
+    if sess_lat_ms > 0 or llm_lat_ms > 0 or tool_lat_ms > 0:
+        perf_text = Text()
+        perf_text.append(" ⚡ Latency & Throughput: ", style="bold cyan")
+        p_segments: list[str] = []
+        if sess_lat_ms > 0:
+            p_segments.append(f"Wall: {_format_latency(sess_lat_ms)}")
+        if llm_lat_ms > 0:
+            llm_seg = f"LLM: {_format_latency(llm_lat_ms)}"
+            if avg_llm_ms > 0:
+                llm_seg += f" (avg {_format_latency(avg_llm_ms)}, p95 {_format_latency(p95_llm_ms)})"
+            p_segments.append(llm_seg)
+        if avg_ttft_ms > 0:
+            p_segments.append(f"TTFT: {_format_latency(avg_ttft_ms)}")
+        if tool_lat_ms > 0:
+            p_segments.append(f"Tools: {_format_latency(tool_lat_ms)}")
+        if out_tps > 0:
+            p_segments.append(f"Out: {_format_tps(out_tps)}")
+        if tot_tps > 0:
+            p_segments.append(f"Total: {_format_tps(tot_tps)}")
+        perf_text.append(" | ".join(p_segments), style="cyan")
+        render_items.append(perf_text)
 
     # --- 3. Model Breakdown Table ---
     models = sess_info.get("breakdown_by_model", {})
@@ -475,6 +530,22 @@ def format_plain_summary_box(
     if savings > 0:
         pct = sess_info.get("savings_pct", 0.0)
         lines.append(f"│  💰 Caching Savings: {_format_usd(savings)} ({pct:.1f}% saved via Context Caching){' ' * 12}│")
+
+    # Latency & Throughput
+    sess_lat_ms = float(sess_info.get("latency_ms", 0.0) or 0.0)
+    llm_lat_ms = float(sess_info.get("llm_latency_ms", 0.0) or 0.0)
+    out_tps = float(sess_info.get("output_tokens_per_sec", 0.0) or 0.0)
+    avg_ttft = float(sess_info.get("avg_ttft_ms", sess_info.get("ttft_ms", 0.0)) or 0.0)
+    if sess_lat_ms > 0 or llm_lat_ms > 0:
+        p_parts = [f"Wall: {_format_latency(sess_lat_ms)}"] if sess_lat_ms > 0 else []
+        if llm_lat_ms > 0:
+            p_parts.append(f"LLM: {_format_latency(llm_lat_ms)}")
+        if avg_ttft > 0:
+            p_parts.append(f"TTFT: {_format_latency(avg_ttft)}")
+        if out_tps > 0:
+            p_parts.append(f"Out: {_format_tps(out_tps)}")
+        perf_line = "⚡ Perf: " + " | ".join(p_parts)
+        lines.append(f"│  {perf_line[:72]:<72}│")
 
     # Budget
     if budget_info and budget_info.get("budget_limit_usd"):

@@ -179,6 +179,12 @@ def _normalize_row(raw: dict[str, Any], source: str = "local") -> dict[str, Any]
         "savings_usd": _to_float(raw.get("savings_usd")),
         "savings_pct": _to_float(raw.get("savings_pct")),
         "tool_calls_count": _to_int(raw.get("tool_calls_count") or raw.get("total_tool_calls") or raw.get("tool_calls")),
+        "latency_ms": _to_float(raw.get("latency_ms")),
+        "llm_latency_ms": _to_float(raw.get("llm_latency_ms")),
+        "tool_latency_ms": _to_float(raw.get("tool_latency_ms")),
+        "ttft_ms": _to_float(raw.get("ttft_ms") or raw.get("avg_ttft_ms")),
+        "output_tokens_per_sec": _to_float(raw.get("output_tokens_per_sec")),
+        "total_tokens_per_sec": _to_float(raw.get("total_tokens_per_sec")),
         "budget_limit_usd": _to_float(raw.get("budget_limit_usd")) if raw.get("budget_limit_usd") not in (None, "") else None,
         "budget_utilization_pct": _to_float(raw.get("budget_utilization_pct")) if raw.get("budget_utilization_pct") not in (None, "") else None,
         "budget_exceeded": str(raw.get("budget_exceeded", "")).lower() in ("true", "1") if isinstance(raw.get("budget_exceeded"), str) else bool(raw.get("budget_exceeded", False)),
@@ -561,7 +567,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
 
     <!-- KPI Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
       <div class="card p-4 border-indigo-900/60">
         <div class="flex items-center justify-between">
           <div class="text-xs text-gray-400 font-medium">Total Spend (USD)</div>
@@ -589,6 +595,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div class="text-xs text-gray-400 font-medium">Total Tokens Processed</div>
         <div id="kpiTotalTokens" class="text-2xl font-bold text-indigo-400 mt-1">0</div>
         <div id="kpiTokenSub" class="text-xs text-gray-400 mt-1">In: 0 • Out: 0 • Think: 0</div>
+      </div>
+      <div class="card p-4 border-cyan-900/60">
+        <div class="text-xs text-cyan-400 font-medium">⚡ Latency & Throughput</div>
+        <div id="kpiLatency" class="text-2xl font-bold text-cyan-300 mt-1">—</div>
+        <div id="kpiThroughputSub" class="text-xs text-gray-400 mt-1">Out: — tok/s • TTFT: —</div>
       </div>
     </div>
 
@@ -678,6 +689,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <th class="py-2.5 px-3 text-right">Tokens (In/Out/Think)</th>
                 <th class="py-2.5 px-3 text-right">Cached</th>
                 <th class="py-2.5 px-3 text-right">Tools (Calls / Fee)</th>
+                <th class="py-2.5 px-3 text-right">⚡ Latency / Tok/s</th>
                 <th class="py-2.5 px-3 text-right">Total Cost</th>
                 <th class="py-2.5 px-3 text-right">Saved</th>
                 <th class="py-2.5 px-3">Source / Error</th>
@@ -882,6 +894,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         let totalCost = 0, llmCost = 0, toolCost = 0, effCost = 0, wastedCost = 0, savedCost = 0;
         let totalTok = 0, inTok = 0, outTok = 0, thinkTok = 0, cachedTok = 0;
         let succCount = 0, failCount = 0;
+        let sumLatMs = 0, sumLlmLatMs = 0, timedOutTok = 0, sumTtftMs = 0, ttftCount = 0, latCount = 0;
 
         kpiRows.forEach(r => {
           totalCost += r.total_cost_usd || 0;
@@ -893,6 +906,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           outTok += r.completion_tokens || 0;
           thinkTok += r.thoughts_tokens || 0;
           cachedTok += r.cached_tokens || 0;
+          if ((r.latency_ms || 0) > 0) { sumLatMs += r.latency_ms; latCount++; }
+          const rowLlmLat = Number(r.llm_latency_ms || 0) || (Number(r.output_tokens_per_sec || 0) > 0 ? Number(r.latency_ms || 0) : 0);
+          if (rowLlmLat > 0) {
+            sumLlmLatMs += rowLlmLat;
+            timedOutTok += (r.completion_tokens || 0) + (r.thoughts_tokens || 0);
+          }
+          if ((r.ttft_ms || 0) > 0) { sumTtftMs += r.ttft_ms; ttftCount++; }
           if (r.is_failure) {
             wastedCost += r.total_cost_usd || 0;
             failCount++;
@@ -913,6 +933,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         document.getElementById('kpiSavingsSub').innerText = `${cachedTok.toLocaleString()} cached tokens`;
         document.getElementById('kpiTotalTokens').innerText = totalTok.toLocaleString();
         document.getElementById('kpiTokenSub').innerText = `In: ${inTok.toLocaleString()} • Out: ${outTok.toLocaleString()} • Think: ${thinkTok.toLocaleString()}`;
+        const fmtDur = ms => (ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms.toFixed(0)}ms`);
+        const avgLatMs = latCount > 0 ? (sumLatMs / latCount) : 0;
+        const aggOutTps = sumLlmLatMs > 0 ? (timedOutTok / (sumLlmLatMs / 1000.0)) : 0;
+        const avgTtftMs = ttftCount > 0 ? (sumTtftMs / ttftCount) : 0;
+        document.getElementById('kpiLatency').innerText = avgLatMs > 0
+          ? (latCount > 1 ? `Avg: ${fmtDur(avgLatMs)}` : fmtDur(avgLatMs))
+          : '—';
+        document.getElementById('kpiThroughputSub').innerText = latCount > 1
+          ? `Total: ${fmtDur(sumLatMs)} • Out: ${aggOutTps > 0 ? aggOutTps.toFixed(1) + ' tok/s' : '—'}${avgTtftMs > 0 ? ' • TTFT: ' + avgTtftMs.toFixed(0) + 'ms' : ''}`
+          : `Out: ${aggOutTps > 0 ? aggOutTps.toFixed(1) + ' tok/s' : '—'} • TTFT: ${avgTtftMs > 0 ? avgTtftMs.toFixed(0) + 'ms' : '—'}`;
 
         renderHierarchyTree(parentMatchedRows, rootVal, subVal);
 
@@ -1234,6 +1264,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           const toolCell = tCalls > 0
             ? `<span class="text-emerald-300">${tCalls} call${tCalls === 1 ? '' : 's'} ($${tCost.toFixed(4)})</span>`
             : `<span class="text-gray-600">—</span>`;
+          const latMs = Number(r.latency_ms || 0);
+          const outTps = Number(r.output_tokens_per_sec || 0);
+          const latStr = latMs > 0 ? (latMs >= 1000 ? `${(latMs / 1000).toFixed(2)}s` : `${latMs.toFixed(0)}ms`) : '';
+          const tpsStr = outTps > 0 ? `${outTps.toFixed(1)} tok/s` : '';
+          const perfCell = (latStr || tpsStr)
+            ? `<span class="text-cyan-300">${latStr || '—'}</span>${tpsStr ? ` <span class="text-gray-400">(${tpsStr})</span>` : ''}`
+            : `<span class="text-gray-600">—</span>`;
           const safeTitle = escapeHtml(r.error || r.source || '');
           const safeSourceOrErr = r.error
             ? `<span class="text-rose-400">⚠️ ${escapeHtml(r.error)}</span>`
@@ -1248,6 +1285,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <td class="py-2 px-3 text-right text-gray-300">${Number(r.total_tokens||0).toLocaleString()} <span class="text-gray-500">(${Number(r.prompt_tokens||0)}/${Number(r.completion_tokens||0)}/${Number(r.thoughts_tokens||0)})</span></td>
             <td class="py-2 px-3 text-right text-amber-400">${Number(r.cached_tokens||0).toLocaleString()}</td>
             <td class="py-2 px-3 text-right">${toolCell}</td>
+            <td class="py-2 px-3 text-right">${perfCell}</td>
             <td class="py-2 px-3 text-right font-semibold text-white">$${Number(r.total_cost_usd||0).toFixed(6)}</td>
             <td class="py-2 px-3 text-right text-emerald-400">${r.savings_usd > 0 ? '$' + Number(r.savings_usd).toFixed(6) : '—'}</td>
             <td class="py-2 px-3 text-gray-400 truncate max-w-xs" title="${safeTitle}">${safeSourceOrErr}</td>
