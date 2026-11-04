@@ -51,6 +51,12 @@ DEFAULT_PROVIDER_TOKEN_PROFILES: dict[str, dict[str, Any]] = {
         "tool_schema_overhead_tokens": 36,  # OpenAPI JSON Schema boilerplate per tool
         "image_tokens": GEMINI_IMAGE_TILE_TOKENS,
         "pdf_page_tokens": GEMINI_PDF_PAGE_TOKENS,
+        "min_cacheable_tokens": {
+            "pro": 2048,
+            "flash": 1024,
+            "legacy_1_5": 32768,
+            "default": 1024,
+        },
     },
     "openai": {
         "ascii_chars_per_token": 4.4,       # Optimized for o200k_base (gpt-4o) / 4.0 fallback for cl100k_base
@@ -61,6 +67,9 @@ DEFAULT_PROVIDER_TOKEN_PROFILES: dict[str, dict[str, Any]] = {
         "tool_schema_overhead_tokens": 42,  # Per-function schema wrapper
         "image_tokens": 425,                # 85 base + 2x 170 (512x512 tiles) standard vision average
         "pdf_page_tokens": 800,             # Extracted page text + vision tile
+        "min_cacheable_tokens": {
+            "default": 1024,
+        },
     },
     "anthropic": {
         "ascii_chars_per_token": 3.6,       # Claude 65k BPE vocab splits words into ~10% more tokens
@@ -81,6 +90,12 @@ DEFAULT_PROVIDER_TOKEN_PROFILES: dict[str, dict[str, Any]] = {
         "tool_schema_overhead_tokens": 45,
         "image_tokens": 1334,               # (1024 * 1024) / 750 per Anthropic Vision docs
         "pdf_page_tokens": 2250,            # Adjusted average: Text (1500-3000) + dual image extraction overhead
+        "min_cacheable_tokens": {
+            "haiku": 2048,
+            "sonnet": 1024,
+            "opus": 1024,
+            "default": 1024,
+        },
     },
     "deepseek": {
         "ascii_chars_per_token": 3.7,       # DeepSeek V3 / R1 128k BPE tokenizer
@@ -91,6 +106,9 @@ DEFAULT_PROVIDER_TOKEN_PROFILES: dict[str, dict[str, Any]] = {
         "tool_schema_overhead_tokens": 40,
         "image_tokens": 512,
         "pdf_page_tokens": 512,
+        "min_cacheable_tokens": {
+            "default": 64,
+        },
     },
 }
 
@@ -244,6 +262,74 @@ def reset_token_profiles() -> None:
     TokenProfileRegistry.reset()
 
 
+def get_min_cacheable_tokens(
+    model_name: str | None = None,
+    provider: str | None = None,
+    rate: Any = None,
+) -> int | None:
+    """Resolves the minimum prefix token floor required for Context Caching on a given model.
+
+    Resolution order:
+    1. Explicit `rate.min_cacheable_tokens` if configured on `ModelRate`.
+    2. If `rate` has no caching discount (`cached_input_per_1m >= input_per_1m`), returns `None`.
+    3. Exact model or provider `min_cacheable_tokens` from `PROVIDER_TOKEN_PROFILES`.
+    4. Provider/model family rules (e.g. 2048 for Gemini Pro & Claude Haiku, 1024 for Flash/OpenAI/Sonnet/Opus, 64 for DeepSeek).
+    """
+    if rate is not None:
+        explicit_floor = getattr(rate, "min_cacheable_tokens", None)
+        if isinstance(explicit_floor, int) and explicit_floor > 0:
+            return explicit_floor
+        in_rate = getattr(rate, "input_per_1m", None)
+        cached_rate = getattr(rate, "cached_input_per_1m", None)
+        if in_rate is not None and cached_rate is not None and float(cached_rate) >= float(in_rate):
+            return None
+
+    m_clean = (model_name or "").strip().lower()
+    if "/" in m_clean:
+        m_clean = m_clean.split("/")[-1]
+
+    p_clean = (provider or "").strip().lower()
+    if not p_clean:
+        if m_clean.startswith(("gemini-", "palm-", "learnlm-")):
+            p_clean = "google"
+        elif m_clean.startswith(("gpt-", "o1", "o3", "o4", "chatgpt-")):
+            p_clean = "openai"
+        elif m_clean.startswith("claude-"):
+            p_clean = "anthropic"
+        elif m_clean.startswith("deepseek-"):
+            p_clean = "deepseek"
+        elif rate is not None and getattr(rate, "provider", None):
+            p_clean = str(getattr(rate, "provider", "")).strip().lower()
+        else:
+            p_clean = "google"
+
+    prof = get_token_profile(m_clean if m_clean in PROVIDER_TOKEN_PROFILES else p_clean, default_provider="google")
+    floor_cfg = prof.get("min_cacheable_tokens")
+    if isinstance(floor_cfg, int):
+        return floor_cfg if floor_cfg > 0 else None
+    if isinstance(floor_cfg, dict):
+        if m_clean in floor_cfg:
+            return int(floor_cfg[m_clean])
+        if p_clean == "google":
+            if "1.5" in m_clean:
+                return int(floor_cfg.get("legacy_1_5", 32768))
+            if "pro" in m_clean:
+                return int(floor_cfg.get("pro", 2048))
+            if "flash" in m_clean:
+                return int(floor_cfg.get("flash", 1024))
+        elif p_clean == "anthropic":
+            if "haiku" in m_clean:
+                return int(floor_cfg.get("haiku", 2048))
+            if "opus" in m_clean:
+                return int(floor_cfg.get("opus", 1024))
+            if "sonnet" in m_clean:
+                return int(floor_cfg.get("sonnet", 1024))
+        if "default" in floor_cfg:
+            return int(floor_cfg["default"])
+
+    return 1024
+
+
 # Automatically load custom token profiles if ADK_FINOPS_TOKEN_PROFILES_PATH is set
 _env_profiles_path = os.environ.get("ADK_FINOPS_TOKEN_PROFILES_PATH")
 if _env_profiles_path:
@@ -251,3 +337,4 @@ if _env_profiles_path:
         load_token_profiles_file(_env_profiles_path)
     except Exception as exc:
         logger.warning(f"Failed to load token profiles from ADK_FINOPS_TOKEN_PROFILES_PATH: {exc}")
+

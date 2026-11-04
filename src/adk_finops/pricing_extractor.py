@@ -124,6 +124,110 @@ OPTIONAL_DISCOVERY_MODELS: dict[str, tuple[str, list[str]]] = {
 }
 
 
+def _normalize_litellm_provider(raw_provider: Any, model_key: str) -> str:
+    """Normalizes LiteLLM provider identifiers into canonical adk-finops provider names."""
+    p = str(raw_provider or "").strip().lower()
+    if p in (
+        "gemini",
+        "google",
+        "vertex_ai",
+        "vertex_ai-language-models",
+        "vertex_ai-text-models",
+        "vertex_ai-embedding-models",
+        "palm",
+    ):
+        return "google"
+    if p in ("openai", "text-completion-openai"):
+        return "openai"
+    if p in ("anthropic",):
+        return "anthropic"
+    if p in ("deepseek",):
+        return "deepseek"
+    if p in ("cohere", "cohere_chat"):
+        return "cohere"
+    if p in ("mistral", "codestral", "text-completion-codestral"):
+        return "mistral"
+    if p:
+        return p
+
+    mk = model_key.strip().lower()
+    if mk.startswith(("gemini", "models/gemini", "vertex_ai/gemini", "palm")):
+        return "google"
+    if mk.startswith(("gpt-", "o1", "o3", "o4", "openai/")):
+        return "openai"
+    if mk.startswith(("claude", "anthropic/")):
+        return "anthropic"
+    if mk.startswith(("deepseek",)):
+        return "deepseek"
+    return "unknown"
+
+
+def _parse_litellm_model_spec(
+    entry: dict[str, Any],
+    provider: str,
+) -> dict[str, Any] | None:
+    """Converts a single LiteLLM model registry entry into an adk-finops model rate dictionary."""
+    import math
+
+    in_tok = entry.get("input_cost_per_token")
+    out_tok = entry.get("output_cost_per_token")
+    if in_tok is None and out_tok is None:
+        return None
+
+    try:
+        in_val = float(in_tok if in_tok is not None else 0.0)
+        out_val = float(out_tok if out_tok is not None else 0.0)
+    except (TypeError, ValueError):
+        return None
+
+    if not math.isfinite(in_val) or not math.isfinite(out_val) or in_val < 0.0 or out_val < 0.0:
+        return None
+
+    in_1m = round(in_val * 1_000_000, 6)
+    out_1m = round(out_val * 1_000_000, 6)
+
+    default_cache_ratio = 0.10 if provider in ("anthropic", "google", "deepseek") else 0.25
+    cache_tok = entry.get("cache_read_input_token_cost")
+    if cache_tok is not None:
+        try:
+            c_val = float(cache_tok)
+            if math.isfinite(c_val) and c_val >= 0.0:
+                cache_1m = round(c_val * 1_000_000, 6)
+            else:
+                cache_1m = round(in_1m * default_cache_ratio, 6)
+        except (TypeError, ValueError):
+            cache_1m = round(in_1m * default_cache_ratio, 6)
+    else:
+        cache_1m = round(in_1m * default_cache_ratio, 6)
+
+    model_dict: dict[str, Any] = {
+        "provider": provider,
+        "input_per_1m": in_1m,
+        "output_per_1m": out_1m,
+        "cached_input_per_1m": cache_1m,
+    }
+
+    # Check >200K high-context tier fields in LiteLLM
+    for src_key, dst_key in (
+        ("input_cost_per_token_above_200k_tokens", "input_per_1m_gt_200k"),
+        ("output_cost_per_token_above_200k_tokens", "output_per_1m_gt_200k"),
+        ("cache_read_input_token_cost_above_200k_tokens", "cached_input_per_1m_gt_200k"),
+        ("input_cost_per_token_above_128k_tokens", "input_per_1m_gt_128k"),
+        ("output_cost_per_token_above_128k_tokens", "output_per_1m_gt_128k"),
+        ("cache_read_input_token_cost_above_128k_tokens", "cached_input_per_1m_gt_128k"),
+    ):
+        raw_tier = entry.get(src_key)
+        if raw_tier is not None:
+            try:
+                t_val = float(raw_tier)
+                if math.isfinite(t_val) and t_val >= 0.0:
+                    model_dict[dst_key] = round(t_val * 1_000_000, 6)
+            except (TypeError, ValueError):
+                pass
+
+    return model_dict
+
+
 @dataclass
 class PricingDiffReport:
     """Structured report summarizing extracted rates vs existing default_rates.json."""
@@ -160,9 +264,9 @@ class GoogleCloudPricingExtractor:
 
     def __init__(
         self,
-        timeout_seconds: float = 8.0,
+        timeout_seconds: float = 15.0,
         gcp_billing_api_key: str | None = None,
-        include_new_models: bool = False,
+        include_new_models: bool = True,
     ) -> None:
         self.timeout_seconds = timeout_seconds
         self.gcp_billing_api_key = gcp_billing_api_key or os.environ.get("GOOGLE_CLOUD_BILLING_API_KEY")
@@ -276,7 +380,7 @@ class GoogleCloudPricingExtractor:
             return {}, False
 
     def extract_from_litellm_registry(self) -> tuple[dict[str, dict[str, Any]], bool]:
-        """Fetches LiteLLM's upstream model_prices_and_context_window.json and converts rates to per-1M USD."""
+        """Fetches LiteLLM's upstream model_prices_and_context_window.json and converts all token-priced models to per-1M USD."""
         try:
             raw = self._fetch_text(LITELLM_PRICING_URL)
             registry = json.loads(raw)
@@ -286,11 +390,26 @@ class GoogleCloudPricingExtractor:
             logger.debug(f"[FinOps Pricing Extractor] Could not fetch LiteLLM registry: {e}")
             return {}, False
 
+        extracted: dict[str, dict[str, Any]] = {}
+
+        # 1. If include_new_models is enabled (default), extract all token-priced models from LiteLLM's registry
+        if self.include_new_models:
+            for raw_key, entry in registry.items():
+                if raw_key == "sample_spec" or not isinstance(entry, dict):
+                    continue
+                clean_key = str(raw_key).strip()
+                if not clean_key:
+                    continue
+                provider = _normalize_litellm_provider(entry.get("litellm_provider"), clean_key)
+                spec = _parse_litellm_model_spec(entry, provider)
+                if spec is not None:
+                    extracted[clean_key] = spec
+
+        # 2. Ensure canonical short alias keys (LITELLM_MODEL_KEY_MAP + OPTIONAL_DISCOVERY_MODELS) are populated
         target_map = dict(LITELLM_MODEL_KEY_MAP)
         if self.include_new_models:
             target_map.update(OPTIONAL_DISCOVERY_MODELS)
 
-        extracted: dict[str, dict[str, Any]] = {}
         for finops_name, (provider, candidate_keys) in target_map.items():
             matched_entry = None
             for cand in candidate_keys:
@@ -299,41 +418,9 @@ class GoogleCloudPricingExtractor:
                     break
             if not matched_entry:
                 continue
-
-            in_tok = matched_entry.get("input_cost_per_token")
-            out_tok = matched_entry.get("output_cost_per_token")
-            if in_tok is None or out_tok is None:
-                continue
-
-            in_1m = round(float(in_tok) * 1_000_000, 6)
-            out_1m = round(float(out_tok) * 1_000_000, 6)
-            cache_tok = matched_entry.get("cache_read_input_token_cost")
-            if cache_tok is not None:
-                cache_1m = round(float(cache_tok) * 1_000_000, 6)
-            else:
-                # Default cache read ratio if not explicitly listed
-                cache_1m = round(in_1m * (0.10 if provider == "anthropic" else 0.25), 6)
-
-            model_dict: dict[str, Any] = {
-                "provider": provider,
-                "input_per_1m": in_1m,
-                "output_per_1m": out_1m,
-                "cached_input_per_1m": cache_1m,
-            }
-
-            # Check >200K high-context tier fields in LiteLLM
-            in_gt_200k = matched_entry.get("input_cost_per_token_above_200k_tokens")
-            out_gt_200k = matched_entry.get("output_cost_per_token_above_200k_tokens")
-            cache_gt_200k = matched_entry.get("cache_read_input_token_cost_above_200k_tokens")
-
-            if in_gt_200k is not None:
-                model_dict["input_per_1m_gt_200k"] = round(float(in_gt_200k) * 1_000_000, 6)
-            if out_gt_200k is not None:
-                model_dict["output_per_1m_gt_200k"] = round(float(out_gt_200k) * 1_000_000, 6)
-            if cache_gt_200k is not None:
-                model_dict["cached_input_per_1m_gt_200k"] = round(float(cache_gt_200k) * 1_000_000, 6)
-
-            extracted[finops_name] = model_dict
+            spec = _parse_litellm_model_spec(matched_entry, provider)
+            if spec is not None:
+                extracted[finops_name] = spec
 
         return extracted, True
 
@@ -478,7 +565,7 @@ class GoogleCloudPricingExtractor:
         )
 
 
-def print_pricing_diff_report(report: PricingDiffReport) -> None:
+def print_pricing_diff_report(report: PricingDiffReport, max_rows: int = 60) -> None:
     """Prints a formatted summary of extracted pricing and diffs to the terminal."""
     try:
         from rich.console import Console
@@ -499,7 +586,11 @@ def print_pricing_diff_report(report: PricingDiffReport) -> None:
         table.add_column("Regional / 2027", justify="center")
 
         models = report.merged_rate_card.get("models", {})
+        shown = 0
         for m_name, spec in models.items():
+            if shown >= max_rows:
+                break
+            shown += 1
             if m_name in report.added_models:
                 status = "[bold green]NEW[/bold green]"
             elif m_name in report.updated_models:
@@ -530,31 +621,47 @@ def print_pricing_diff_report(report: PricingDiffReport) -> None:
                 flag_str,
             )
 
+        if len(models) > shown:
+            table.add_row(
+                f"... (+{len(models) - shown} more models)",
+                "multi-provider",
+                "[dim]SYNCED[/dim]",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+            )
+
         console.print()
         console.print(table)
         console.print(
             f"📡 [bold]Live Sources Synced:[/bold] {', '.join(report.sources_succeeded) or 'offline_canonical_baseline'} | "
+            f"[bold cyan]Total Models: {len(models)}[/bold cyan] | "
             f"[green]Added: {len(report.added_models)}[/green] | "
             f"[yellow]Updated: {len(report.updated_models)}[/yellow] | "
             f"Verified Unchanged: {len(report.unchanged_models)}\n"
         )
     except ImportError:
+        models = report.merged_rate_card.get("models", {})
         print(f"\n=== ADK FinOps Pricing Extraction Report ({report.timestamp_iso}) ===")
         print(f"Sources Succeeded: {', '.join(report.sources_succeeded) or 'offline_canonical_baseline'}")
         print(
-            f"Added: {len(report.added_models)} | Updated: {len(report.updated_models)} | "
+            f"Total Models: {len(models)} | Added: {len(report.added_models)} | Updated: {len(report.updated_models)} | "
             f"Verified Unchanged: {len(report.unchanged_models)}"
         )
-        for m_name, diffs in report.updated_models.items():
+        for m_name, diffs in list(report.updated_models.items())[:25]:
             print(f"  [UPDATED] {m_name}: {diffs}")
-        for m_name in report.added_models:
+        for m_name in list(report.added_models.keys())[:25]:
             print(f"  [NEW] {m_name}")
+        if len(report.added_models) > 25:
+            print(f"  ... (+{len(report.added_models) - 25} more newly extracted models)")
 
 
 def extract_and_sync_pricing(
     update_default: bool = False,
     output_path: str | Path | None = None,
-    include_new_models: bool = False,
+    include_new_models: bool = True,
     gcp_billing_api_key: str | None = None,
     print_report: bool = True,
 ) -> PricingDiffReport:
@@ -606,7 +713,13 @@ def main() -> None:
     parser.add_argument(
         "--include-new-models",
         action="store_true",
-        help="Also discover and add new flagship models (e.g. gpt-4.1, o3, claude-4) from upstream feeds",
+        default=True,
+        help="Extract all token-priced models from upstream LiteLLM registry (enabled by default)",
+    )
+    parser.add_argument(
+        "--curated-only",
+        action="store_true",
+        help="Only sync curated baseline models instead of the full LiteLLM model registry",
     )
     parser.add_argument(
         "--gcp-api-key",
@@ -618,7 +731,7 @@ def main() -> None:
     extract_and_sync_pricing(
         update_default=args.update_default,
         output_path=args.output,
-        include_new_models=args.include_new_models,
+        include_new_models=not args.curated_only,
         gcp_billing_api_key=args.gcp_api_key,
         print_report=True,
     )

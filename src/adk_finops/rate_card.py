@@ -47,7 +47,7 @@ DEFAULT_REMOTE_CACHE_TTL_SECONDS = 86400  # 24 hours
 DEFAULT_REMOTE_CACHE_PATH = Path.home() / ".cache" / "adk-finops" / "remote_rates.json"
 
 
-MAX_HTTP_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB ceiling for remote rate card / pricing JSON
+MAX_HTTP_RESPONSE_BYTES = 15 * 1024 * 1024  # 15 MB ceiling for remote rate card / pricing JSON
 _BLOCKED_METADATA_HOSTS = frozenset({
     "169.254.169.254",
     "metadata.google.internal",
@@ -137,6 +137,7 @@ class ModelRate:
     input_per_1m_gt_128k: float | None = None
     output_per_1m_gt_128k: float | None = None
     cached_input_per_1m_gt_128k: float | None = None
+    min_cacheable_tokens: int | None = None
     is_fallback: bool = False
 
     @classmethod
@@ -194,6 +195,14 @@ class ModelRate:
         out_gt_128k = effective_data.get("output_per_1m_gt_128k", out_gt_200k)
         cached_gt_128k = effective_data.get("cached_input_per_1m_gt_128k", cached_gt_200k)
 
+        raw_min_cache = effective_data.get("min_cacheable_tokens")
+        min_cache_int: int | None = None
+        if raw_min_cache is not None:
+            try:
+                min_cache_int = max(0, int(raw_min_cache))
+            except Exception:
+                min_cache_int = None
+
         return cls(
             provider=effective_data.get("provider", "unknown"),
             input_per_1m=_safe_non_negative_float(
@@ -211,6 +220,7 @@ class ModelRate:
             input_per_1m_gt_128k=_safe_non_negative_float(in_gt_128k) if in_gt_128k is not None else None,
             output_per_1m_gt_128k=_safe_non_negative_float(out_gt_128k) if out_gt_128k is not None else None,
             cached_input_per_1m_gt_128k=_safe_non_negative_float(cached_gt_128k) if cached_gt_128k is not None else None,
+            min_cacheable_tokens=min_cache_int,
             is_fallback=bool(effective_data.get("is_fallback", is_fallback)),
         )
 
@@ -587,8 +597,14 @@ class RateCardRegistry:
             if clean in self._models:
                 return self._models[clean]
 
-            # 2. Prefix / substring match (e.g. 'gemini-2.5-pro-001' -> 'gemini-2.5-pro')
-            for key, rate in self._models.items():
+            # 2. Bare model name match after provider prefix (e.g. 'models/gemini-2.5-pro' -> 'gemini-2.5-pro')
+            if "/" in clean:
+                bare = clean.rsplit("/", 1)[-1]
+                if bare in self._models:
+                    return self._models[bare]
+
+            # 3. Longest prefix / substring match (e.g. 'gemini-2.5-pro-001' -> 'gemini-2.5-pro')
+            for key, rate in sorted(self._models.items(), key=lambda kv: len(kv[0]), reverse=True):
                 if clean.startswith(key) or key in clean:
                     return rate
 
@@ -620,6 +636,15 @@ class RateCardRegistry:
         with self._lock:
             base_fee = self._tools.get(clean, 0.0)
             return round(base_fee * self._global_discount, 7)
+
+    def get_rate(self, model_name: str | None) -> ModelRate:
+        """Alias for `resolve_model(model_name)`."""
+        return self.resolve_model(model_name)
+
+    def all_rates(self) -> dict[str, ModelRate]:
+        """Returns a shallow copy of all registered `{model_name: ModelRate}` mappings."""
+        with self._lock:
+            return dict(self._models)
 
     @property
     def registered_models(self) -> list[str]:

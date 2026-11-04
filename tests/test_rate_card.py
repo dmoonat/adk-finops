@@ -310,6 +310,93 @@ def test_pricing_extractor_merges_and_preserves_curated_fields(monkeypatch) -> N
     assert models["gemini-3.1-pro-preview"]["input_per_1m_gt_200k"] == 4.00
 
 
+def test_extract_all_models_from_litellm_registry(monkeypatch) -> None:
+    """Verifies extract_from_litellm_registry extracts all token-priced models from LiteLLM JSON."""
+    from adk_finops.pricing_extractor import GoogleCloudPricingExtractor
+
+    extractor = GoogleCloudPricingExtractor(include_new_models=True)
+    mock_litellm_payload = {
+        "sample_spec": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.002,
+        },
+        "dall-e-3": {
+            "litellm_provider": "openai",
+            "mode": "image_generation",
+        },
+        "bedrock/anthropic.claude-sonnet-4-20250514-v1:0": {
+            "litellm_provider": "bedrock",
+            "input_cost_per_token": 3e-06,
+            "output_cost_per_token": 1.5e-05,
+            "cache_read_input_token_cost": 3e-07,
+            "input_cost_per_token_above_200k_tokens": 6e-06,
+            "output_cost_per_token_above_200k_tokens": 2.25e-05,
+        },
+        "gemini/learnlm-1.5-pro-experimental": {
+            "litellm_provider": "gemini",
+            "input_cost_per_token": 1.25e-06,
+            "output_cost_per_token": 5e-06,
+            "input_cost_per_token_above_128k_tokens": 2.5e-06,
+            "output_cost_per_token_above_128k_tokens": 1e-05,
+        },
+    }
+    monkeypatch.setattr(extractor, "_fetch_text", lambda url, extra_headers=None: json.dumps(mock_litellm_payload))
+    extracted, ok = extractor.extract_from_litellm_registry()
+    assert ok is True
+    assert "sample_spec" not in extracted
+    assert "dall-e-3" not in extracted
+    assert "bedrock/anthropic.claude-sonnet-4-20250514-v1:0" in extracted
+    bedrock_spec = extracted["bedrock/anthropic.claude-sonnet-4-20250514-v1:0"]
+    assert bedrock_spec["provider"] == "bedrock"
+    assert bedrock_spec["input_per_1m"] == 3.0
+    assert bedrock_spec["output_per_1m"] == 15.0
+    assert bedrock_spec["cached_input_per_1m"] == 0.3
+    assert bedrock_spec["input_per_1m_gt_200k"] == 6.0
+    assert bedrock_spec["output_per_1m_gt_200k"] == 22.5
+
+    learnlm_spec = extracted["gemini/learnlm-1.5-pro-experimental"]
+    assert learnlm_spec["provider"] == "google"
+    assert learnlm_spec["input_per_1m_gt_128k"] == 2.5
+    assert learnlm_spec["output_per_1m_gt_128k"] == 10.0
 
 
+def test_rate_card_helpers_and_min_cacheable_tokens() -> None:
+    """Verifies get_rate, all_rates, bare model name resolution, longest-prefix match, and get_min_cacheable_tokens."""
+    from adk_finops import get_min_cacheable_tokens
+
+    reg = RateCardRegistry()
+    all_r = reg.all_rates()
+    assert len(all_r) > 2500
+    assert reg.get_rate("gemini-2.5-pro").input_per_1m == 1.25
+    assert reg.resolve_model("models/gemini-2.5-pro").input_per_1m == 1.25
+
+    assert get_min_cacheable_tokens("gemini-2.5-pro") == 2048
+    assert get_min_cacheable_tokens("gemini-2.5-flash") == 1024
+    assert get_min_cacheable_tokens("gemini-1.5-pro") == 32768
+    assert get_min_cacheable_tokens("claude-3-5-haiku-latest") == 2048
+    assert get_min_cacheable_tokens("claude-sonnet-4-20250514") == 1024
+    assert get_min_cacheable_tokens("gpt-4o") == 1024
+    assert get_min_cacheable_tokens("deepseek-chat") == 64
+
+    custom_rate = ModelRate.from_dict(
+        {
+            "provider": "google",
+            "input_per_1m": 1.0,
+            "output_per_1m": 2.0,
+            "cached_input_per_1m": 0.1,
+            "min_cacheable_tokens": 4096,
+        }
+    )
+    assert custom_rate.min_cacheable_tokens == 4096
+    assert get_min_cacheable_tokens("gemini-2.5-flash", rate=custom_rate) == 4096
+
+    no_cache_rate = ModelRate.from_dict(
+        {
+            "provider": "openai",
+            "input_per_1m": 1.0,
+            "output_per_1m": 2.0,
+            "cached_input_per_1m": 1.0,
+        }
+    )
+    assert get_min_cacheable_tokens("gpt-4o", rate=no_cache_rate) is None
 
