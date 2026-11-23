@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "2026.09",
-  "last_updated_utc": "2026-11-16T14:24:33.761535+00:00",
+  "last_updated_utc": "2026-11-23T16:58:11.922523+00:00",
   "source_urls": [
     "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -8698,9 +8698,9 @@
     },
     "mistral/mistral-large-latest": {
       "provider": "mistral",
-      "input_per_1m": 0.5,
-      "output_per_1m": 1.5,
-      "cached_input_per_1m": 0.05
+      "input_per_1m": 0.7,
+      "output_per_1m": 2.1,
+      "cached_input_per_1m": 0.07
     },
     "mistral/mistral-large-3": {
       "provider": "mistral",
@@ -10770,9 +10770,9 @@
     },
     "snowflake/llama3.1-8b": {
       "provider": "snowflake",
-      "input_per_1m": 0.24,
-      "output_per_1m": 0.24,
-      "cached_input_per_1m": 0.06
+      "input_per_1m": 0.22,
+      "output_per_1m": 0.22,
+      "cached_input_per_1m": 0.055
     },
     "snowflake/llama3.3-70b": {
       "provider": "snowflake",
@@ -15687,9 +15687,9 @@
     },
     "bedrock_mantle/anthropic.claude-haiku-4-5": {
       "provider": "bedrock_mantle",
-      "input_per_1m": 1.0,
-      "output_per_1m": 5.0,
-      "cached_input_per_1m": 0.1
+      "input_per_1m": 1.1,
+      "output_per_1m": 5.5,
+      "cached_input_per_1m": 0.11
     },
     "bedrock_mantle/anthropic.claude-opus-5-5": {
       "provider": "bedrock_mantle",
@@ -15801,15 +15801,15 @@
     },
     "snowflake/openai-gpt-5-mini": {
       "provider": "snowflake",
-      "input_per_1m": 0.3,
-      "output_per_1m": 1.2,
-      "cached_input_per_1m": 0.075
+      "input_per_1m": 0.25,
+      "output_per_1m": 2.0,
+      "cached_input_per_1m": 0.03
     },
     "snowflake/openai-gpt-5-nano": {
       "provider": "snowflake",
-      "input_per_1m": 0.15,
-      "output_per_1m": 0.6,
-      "cached_input_per_1m": 0.0375
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.44,
+      "cached_input_per_1m": 0.01
     },
     "snowflake/llama4-maverick": {
       "provider": "snowflake",
@@ -20985,7 +20985,7 @@
     "wandb/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B": {
       "provider": "wandb",
       "input_per_1m": 0.15,
-      "output_per_1m": 0.5,
+      "output_per_1m": 0.47,
       "cached_input_per_1m": 0.02
     },
     "together_ai/reflection/Beam-1.0-501B-A23B": {
@@ -22887,9 +22887,9 @@
     },
     "fireworks_ai/accounts/fireworks/routers/spot-deepseek-v4-flash": {
       "provider": "fireworks_ai",
-      "input_per_1m": 0.105,
-      "output_per_1m": 0.21,
-      "cached_input_per_1m": 0.021
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.14,
+      "cached_input_per_1m": 0.014
     },
     "fireworks_ai/accounts/fireworks/routers/kimi-k3-spot": {
       "provider": "fireworks_ai",
@@ -22899,27 +22899,27 @@
     },
     "fireworks_ai/accounts/fireworks/routers/glm-5p3-spot": {
       "provider": "fireworks_ai",
-      "input_per_1m": 0.98,
-      "output_per_1m": 3.08,
-      "cached_input_per_1m": 0.182
+      "input_per_1m": 0.7,
+      "output_per_1m": 2.2,
+      "cached_input_per_1m": 0.13
     },
     "fireworks_ai/accounts/fireworks/routers/deepseek-v4p1-flash-spot": {
       "provider": "fireworks_ai",
-      "input_per_1m": 0.21,
-      "output_per_1m": 0.84,
-      "cached_input_per_1m": 0.0042
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.6,
+      "cached_input_per_1m": 0.003
     },
     "fireworks_ai/accounts/fireworks/routers/deepseek-v4p1-flash-1017-ultrafast": {
       "provider": "fireworks_ai",
-      "input_per_1m": 2.4,
-      "output_per_1m": 9.6,
-      "cached_input_per_1m": 0.048
+      "input_per_1m": 1.2,
+      "output_per_1m": 4.8,
+      "cached_input_per_1m": 0.024
     },
     "fireworks_ai/accounts/fireworks/routers/deepseek-v4p1-flash-1017-spot": {
       "provider": "fireworks_ai",
-      "input_per_1m": 0.21,
-      "output_per_1m": 0.84,
-      "cached_input_per_1m": 0.0042
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.6,
+      "cached_input_per_1m": 0.003
     },
     "bigmodel/glm-5.3": {
       "provider": "bigmodel",
@@ -22953,9 +22953,9 @@
     },
     "gpt-6-rosalind": {
       "provider": "openai",
-      "input_per_1m": 15.0,
-      "output_per_1m": 75.0,
-      "cached_input_per_1m": 1.5
+      "input_per_1m": 10.0,
+      "output_per_1m": 50.0,
+      "cached_input_per_1m": 1.0
     },
     "gpt-6-cyber": {
       "provider": "openai",
@@ -24578,9 +24578,9 @@
     },
     "fireworks_ai/accounts/fireworks/routers/kimi-latest": {
       "provider": "fireworks_ai",
-      "input_per_1m": 3.0,
-      "output_per_1m": 15.0,
-      "cached_input_per_1m": 0.3
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.2
     },
     "fireworks_ai/accounts/fireworks/routers/qwen-max-latest": {
       "provider": "fireworks_ai",
@@ -25243,15 +25243,15 @@
     },
     "databricks/databricks-gemini-4-carbon": {
       "provider": "databricks",
-      "input_per_1m": 2.0,
-      "output_per_1m": 10.0,
-      "cached_input_per_1m": 2.0
+      "input_per_1m": 2.49998,
+      "output_per_1m": 12.49997,
+      "cached_input_per_1m": 0.12502
     },
     "databricks/system.ai.gemini-4-carbon": {
       "provider": "databricks",
-      "input_per_1m": 2.0,
-      "output_per_1m": 10.0,
-      "cached_input_per_1m": 2.0
+      "input_per_1m": 2.49998,
+      "output_per_1m": 12.49997,
+      "cached_input_per_1m": 0.12502
     },
     "gemini/gemini-decision-1": {
       "provider": "google",
@@ -25294,6 +25294,5700 @@
       "input_per_1m": 0.3,
       "output_per_1m": 1.0,
       "cached_input_per_1m": 0.06
+    },
+    "azure_ai/gpt-5.6-sol": {
+      "provider": "azure_ai",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.4
+    },
+    "azure_ai/gpt-5.6-sol-2026-07-09": {
+      "provider": "azure_ai",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.4
+    },
+    "azure_ai/gpt-5.6-terra": {
+      "provider": "azure_ai",
+      "input_per_1m": 2.0,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.2
+    },
+    "azure_ai/gpt-5.6-terra-2026-07-09": {
+      "provider": "azure_ai",
+      "input_per_1m": 2.0,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.2
+    },
+    "azure_ai/gpt-5.6-luna": {
+      "provider": "azure_ai",
+      "input_per_1m": 0.2,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.02
+    },
+    "azure_ai/gpt-5.6-luna-2026-07-09": {
+      "provider": "azure_ai",
+      "input_per_1m": 0.2,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.02
+    },
+    "eu.cohere.embed-v4:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.03
+    },
+    "command-a-reasoning-08-2025": {
+      "provider": "cohere",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "command-a-translate-08-2025": {
+      "provider": "cohere",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "command-a-vision-07-2025": {
+      "provider": "cohere",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "north-mini-code-1.0": {
+      "provider": "cohere",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "north-small-translate-1.0": {
+      "provider": "cohere",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "dashscope/qwen4-max": {
+      "provider": "dashscope",
+      "input_per_1m": 1.5,
+      "output_per_1m": 4.5,
+      "cached_input_per_1m": 0.075
+    },
+    "inferenceapis/MiniMaxAI/MiniMax-M3.1-Flash": {
+      "provider": "inferenceapis",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.02
+    },
+    "inferenceapis/moonshotai/Kimi-K2.6": {
+      "provider": "inferenceapis",
+      "input_per_1m": 0.98,
+      "output_per_1m": 4.55,
+      "cached_input_per_1m": 0.245
+    },
+    "inferenceapis/moonshotai/Kimi-K3.1-Pro": {
+      "provider": "inferenceapis",
+      "input_per_1m": 2.6,
+      "output_per_1m": 13.0,
+      "cached_input_per_1m": 0.26
+    },
+    "inferenceapis/nvidia/NVIDIA-Nemotron-3.5-Super-VL": {
+      "provider": "inferenceapis",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.65,
+      "cached_input_per_1m": 0.03
+    },
+    "perplexity/pplx-embed-v2-context-0.6b": {
+      "provider": "perplexity",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "perplexity/pplx-embed-v2-context-9b": {
+      "provider": "perplexity",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.03
+    },
+    "resetdata/deepseek/deepseek-v4-flash": {
+      "provider": "resetdata",
+      "input_per_1m": 0.07432,
+      "output_per_1m": 0.1486,
+      "cached_input_per_1m": 0.01351
+    },
+    "resetdata/google/gemma-4-26b-a4b-it": {
+      "provider": "resetdata",
+      "input_per_1m": 0.06054,
+      "output_per_1m": 0.3328,
+      "cached_input_per_1m": 0.015135
+    },
+    "resetdata/qwen/qwen3-coder-30b-a3b-instruct": {
+      "provider": "resetdata",
+      "input_per_1m": 0.07061,
+      "output_per_1m": 0.2723,
+      "cached_input_per_1m": 0.017653
+    },
+    "resetdata/qwen/qwen3.8-27b": {
+      "provider": "resetdata",
+      "input_per_1m": 0.2905,
+      "output_per_1m": 2.453,
+      "cached_input_per_1m": 0.072625
+    },
+    "resetdata/zai/glm-5.3": {
+      "provider": "resetdata",
+      "input_per_1m": 1.189,
+      "output_per_1m": 3.736,
+      "cached_input_per_1m": 0.1757
+    },
+    "snowflake/claude-opus-5-5": {
+      "provider": "snowflake",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.2
+    },
+    "snowflake/claude-sonnet-5-5": {
+      "provider": "snowflake",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "snowflake/claude-haiku-5-5": {
+      "provider": "snowflake",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.5,
+      "cached_input_per_1m": 0.01
+    },
+    "snowflake/claude-sonnet-5": {
+      "provider": "snowflake",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.2
+    },
+    "snowflake/claude-opus-5": {
+      "provider": "snowflake",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "snowflake/claude-opus-4-8": {
+      "provider": "snowflake",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "snowflake/claude-opus-4-7": {
+      "provider": "snowflake",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "snowflake/claude-opus-4-6": {
+      "provider": "snowflake",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "snowflake/claude-opus-4-5": {
+      "provider": "snowflake",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "snowflake/llama3.2-1b": {
+      "provider": "snowflake",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.1,
+      "cached_input_per_1m": 0.025
+    },
+    "snowflake/llama3.2-3b": {
+      "provider": "snowflake",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.15,
+      "cached_input_per_1m": 0.0375
+    },
+    "snowflake/mistral-7b": {
+      "provider": "snowflake",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.2,
+      "cached_input_per_1m": 0.0375
+    },
+    "together_ai/thinkingmachines/inkling": {
+      "provider": "together_ai",
+      "input_per_1m": 1.0,
+      "output_per_1m": 4.05,
+      "cached_input_per_1m": 0.17
+    },
+    "vispark/vision-small": {
+      "provider": "vispark",
+      "input_per_1m": 1.05,
+      "output_per_1m": 3.16,
+      "cached_input_per_1m": 0.0
+    },
+    "vispark/vision-medium": {
+      "provider": "vispark",
+      "input_per_1m": 4.21,
+      "output_per_1m": 12.63,
+      "cached_input_per_1m": 0.0
+    },
+    "vispark/vision-large": {
+      "provider": "vispark",
+      "input_per_1m": 7.37,
+      "output_per_1m": 22.11,
+      "cached_input_per_1m": 0.0
+    },
+    "vertex_ai/meta/muse-wonder-1.0": {
+      "provider": "google",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.2
+    },
+    "vertex_ai/meta/muse-ember-1.0": {
+      "provider": "google",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.5,
+      "cached_input_per_1m": 0.004,
+      "input_per_1m_gt_200k": 0.3,
+      "output_per_1m_gt_200k": 1.5,
+      "cached_input_per_1m_gt_200k": 0.012
+    },
+    "vertex_ai/meta/muse-spark-1.3": {
+      "provider": "google",
+      "input_per_1m": 1.25,
+      "output_per_1m": 4.25,
+      "cached_input_per_1m": 0.15
+    },
+    "sarvam/sarvam-105b": {
+      "provider": "sarvam",
+      "input_per_1m": 0.106383,
+      "output_per_1m": 0.265957,
+      "cached_input_per_1m": 0.00266
+    },
+    "sarvam/sarvam-105b-conversations": {
+      "provider": "sarvam",
+      "input_per_1m": 0.106383,
+      "output_per_1m": 0.265957,
+      "cached_input_per_1m": 0.00266
+    },
+    "sarvam/glm5.3": {
+      "provider": "sarvam",
+      "input_per_1m": 1.340426,
+      "output_per_1m": 4.148936,
+      "cached_input_per_1m": 0.212766
+    },
+    "sarvam/glm5.3-flash": {
+      "provider": "sarvam",
+      "input_per_1m": 0.143617,
+      "output_per_1m": 0.478723,
+      "cached_input_per_1m": 0.026596
+    },
+    "sarvam/gemma4": {
+      "provider": "sarvam",
+      "input_per_1m": 0.37234,
+      "output_per_1m": 0.957447,
+      "cached_input_per_1m": 0.106383
+    },
+    "sarvam/deepseekv4.1-flash-1017": {
+      "provider": "sarvam",
+      "input_per_1m": 0.148936,
+      "output_per_1m": 0.585106,
+      "cached_input_per_1m": 0.00266
+    },
+    "sarvam/deepseekv4.1-flash-1017-interactive": {
+      "provider": "sarvam",
+      "input_per_1m": 0.265957,
+      "output_per_1m": 1.117021,
+      "cached_input_per_1m": 0.005319
+    },
+    "us.openai.gpt-daybreak-blue-5.6-sol": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 4.4,
+      "output_per_1m": 22.0,
+      "cached_input_per_1m": 0.44
+    },
+    "global.openai.gpt-daybreak-blue-5.6-sol": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.4
+    },
+    "us.openai.gpt-5.6-cyber": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 13.75,
+      "output_per_1m": 82.5,
+      "cached_input_per_1m": 1.375
+    },
+    "global.openai.gpt-5.6-cyber": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 12.5,
+      "output_per_1m": 75.0,
+      "cached_input_per_1m": 1.25
+    },
+    "us-gov.openai.gpt-5.6-terra": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 2.64,
+      "output_per_1m": 15.84,
+      "cached_input_per_1m": 0.264
+    },
+    "us-gov.openai.gpt-5.6-luna": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.264,
+      "output_per_1m": 1.584,
+      "cached_input_per_1m": 0.0264
+    },
+    "us-gov.openai.gpt-5.4": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 3.3,
+      "output_per_1m": 19.8,
+      "cached_input_per_1m": 0.33
+    },
+    "bedrock_mantle/us-gov-east-1/openai.gpt-5.6-terra": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 2.64,
+      "output_per_1m": 15.84,
+      "cached_input_per_1m": 0.264
+    },
+    "bedrock_mantle/us-gov-east-1/openai.gpt-5.6-luna": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.264,
+      "output_per_1m": 1.584,
+      "cached_input_per_1m": 0.0264
+    },
+    "bedrock_mantle/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 1.85,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.29,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock_mantle/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.38,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.04,
+      "output_per_1m": 0.08,
+      "cached_input_per_1m": 0.01
+    },
+    "bedrock_mantle/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.3,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.075
+    },
+    "bedrock_mantle/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.3,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.075
+    },
+    "bedrock_mantle/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.3,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.075
+    },
+    "bedrock_mantle/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.4,
+      "output_per_1m": 2.0,
+      "cached_input_per_1m": 0.1
+    },
+    "bedrock_mantle/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.5,
+      "output_per_1m": 1.5,
+      "cached_input_per_1m": 0.125
+    },
+    "bedrock_mantle/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.2,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.1,
+      "cached_input_per_1m": 0.025
+    },
+    "bedrock_mantle/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.15,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock_mantle/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.5,
+      "output_per_1m": 1.5,
+      "cached_input_per_1m": 0.125
+    },
+    "bedrock_mantle/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.04,
+      "output_per_1m": 0.04,
+      "cached_input_per_1m": 0.01
+    },
+    "bedrock_mantle/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.3,
+      "cached_input_per_1m": 0.025
+    },
+    "bedrock_mantle/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 3.0,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.6,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock_mantle/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock_mantle/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.65,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock_mantle/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.5,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.125
+    },
+    "bedrock_mantle/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.6,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock_mantle/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 2.2,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.0,
+      "output_per_1m": 3.2,
+      "cached_input_per_1m": 0.25
+    },
+    "azure/us-gov/gpt-4.1": {
+      "provider": "azure",
+      "input_per_1m": 2.75,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.688
+    },
+    "azure/us-gov/gpt-4.1-mini": {
+      "provider": "azure",
+      "input_per_1m": 0.55,
+      "output_per_1m": 2.2,
+      "cached_input_per_1m": 0.138
+    },
+    "azure/us-gov/gpt-4o": {
+      "provider": "azure",
+      "input_per_1m": 3.438,
+      "output_per_1m": 13.75,
+      "cached_input_per_1m": 1.719
+    },
+    "azure/us-gov/gpt-4o-mini": {
+      "provider": "azure",
+      "input_per_1m": 0.207,
+      "output_per_1m": 0.825,
+      "cached_input_per_1m": 0.104
+    },
+    "azure/us-gov/gpt-5.6-luna": {
+      "provider": "azure",
+      "input_per_1m": 0.275,
+      "output_per_1m": 1.65,
+      "cached_input_per_1m": 0.0275
+    },
+    "azure/us-gov/gpt-5.6-sol": {
+      "provider": "azure",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "azure/us-gov/gpt-5.6-terra": {
+      "provider": "azure",
+      "input_per_1m": 2.75,
+      "output_per_1m": 16.5,
+      "cached_input_per_1m": 0.275
+    },
+    "azure/us-gov/text-embedding-ada-002": {
+      "provider": "azure",
+      "input_per_1m": 0.125,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.03125
+    },
+    "perplexity/openai/gpt-6.1-terra": {
+      "provider": "perplexity",
+      "input_per_1m": 1.0,
+      "output_per_1m": 5.0,
+      "cached_input_per_1m": 0.05
+    },
+    "perplexity/openai/gpt-6.2-astra": {
+      "provider": "perplexity",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "perplexity/openai/gpt-6.2-sol": {
+      "provider": "perplexity",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "perplexity_orchestrator/anthropic/claude-fable-5-2": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.2
+    },
+    "perplexity_orchestrator/anthropic/claude-fable-5-1": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 10.0,
+      "output_per_1m": 50.0,
+      "cached_input_per_1m": 0.25
+    },
+    "perplexity_orchestrator/anthropic/claude-fable-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 10.0,
+      "output_per_1m": 50.0,
+      "cached_input_per_1m": 1.0
+    },
+    "perplexity_orchestrator/anthropic/claude-opus-5-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.2
+    },
+    "perplexity_orchestrator/anthropic/claude-opus-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "perplexity_orchestrator/anthropic/claude-sonnet-5-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "perplexity_orchestrator/anthropic/claude-sonnet-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.2
+    },
+    "perplexity_orchestrator/anthropic/claude-haiku-5-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.5,
+      "cached_input_per_1m": 0.01
+    },
+    "perplexity_orchestrator/anthropic/claude-opus-4-8": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "perplexity_orchestrator/anthropic/claude-opus-4-7": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "perplexity_orchestrator/anthropic/claude-opus-4-6": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "perplexity_orchestrator/anthropic/claude-opus-4-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 5.0,
+      "output_per_1m": 25.0,
+      "cached_input_per_1m": 0.5
+    },
+    "perplexity_orchestrator/anthropic/claude-sonnet-4-6": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3
+    },
+    "perplexity_orchestrator/anthropic/claude-sonnet-4-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3
+    },
+    "perplexity_orchestrator/anthropic/claude-haiku-4-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.0,
+      "output_per_1m": 5.0,
+      "cached_input_per_1m": 0.1
+    },
+    "perplexity_orchestrator/openai/gpt-6.2-astra": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "perplexity_orchestrator/openai/gpt-6.2-sol": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "perplexity_orchestrator/openai/gpt-6.1-sol": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "perplexity_orchestrator/openai/gpt-6.1-terra": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.0,
+      "output_per_1m": 5.0,
+      "cached_input_per_1m": 0.05
+    },
+    "perplexity_orchestrator/openai/gpt-6-astra": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 10.0,
+      "output_per_1m": 50.0,
+      "cached_input_per_1m": 1.0
+    },
+    "perplexity_orchestrator/openai/gpt-6-sol": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.2
+    },
+    "perplexity_orchestrator/openai/gpt-6-luna": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.5,
+      "cached_input_per_1m": 0.01
+    },
+    "perplexity_orchestrator/openai/gpt-5.6-sol": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 4.0,
+      "output_per_1m": 20.0,
+      "cached_input_per_1m": 0.4
+    },
+    "perplexity_orchestrator/openai/gpt-5.6-terra": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.2
+    },
+    "perplexity_orchestrator/openai/gpt-5.6-luna": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.2,
+      "output_per_1m": 1.2,
+      "cached_input_per_1m": 0.02
+    },
+    "perplexity_orchestrator/openai/gpt-5.5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 5.0,
+      "output_per_1m": 30.0,
+      "cached_input_per_1m": 0.5
+    },
+    "perplexity_orchestrator/openai/gpt-5.4": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.5,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.25
+    },
+    "perplexity_orchestrator/openai/gpt-5.4-mini": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.75,
+      "output_per_1m": 4.5,
+      "cached_input_per_1m": 0.075
+    },
+    "perplexity_orchestrator/openai/gpt-5.4-nano": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.2,
+      "output_per_1m": 1.25,
+      "cached_input_per_1m": 0.02
+    },
+    "perplexity_orchestrator/openai/gpt-5.3-codex": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 3.5,
+      "output_per_1m": 28.0,
+      "cached_input_per_1m": 0.35
+    },
+    "perplexity_orchestrator/openai/gpt-5.2": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.75,
+      "output_per_1m": 14.0,
+      "cached_input_per_1m": 0.175
+    },
+    "perplexity_orchestrator/openai/gpt-5.1": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.25,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.125
+    },
+    "perplexity_orchestrator/openai/gpt-5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.25,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.125
+    },
+    "perplexity_orchestrator/openai/gpt-5-mini": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.25,
+      "output_per_1m": 2.0,
+      "cached_input_per_1m": 0.025
+    },
+    "perplexity_orchestrator/openai/gpt-5-nano": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.005
+    },
+    "perplexity_orchestrator/google/gemini-3.8-flash": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "cached_input_per_1m": 0.075
+    },
+    "perplexity_orchestrator/google/gemini-3.7-flash": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "cached_input_per_1m": 0.075
+    },
+    "perplexity_orchestrator/google/gemini-3.6-flash": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.5,
+      "output_per_1m": 7.5,
+      "cached_input_per_1m": 0.15
+    },
+    "perplexity_orchestrator/google/gemini-3.5-flash": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.5,
+      "output_per_1m": 9.0,
+      "cached_input_per_1m": 0.15
+    },
+    "perplexity_orchestrator/google/gemini-3.5-flash-lite": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.3,
+      "output_per_1m": 2.5,
+      "cached_input_per_1m": 0.03
+    },
+    "perplexity_orchestrator/xai/grok-4.7": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 6.0,
+      "cached_input_per_1m": 0.5,
+      "input_per_1m_gt_200k": 4.0,
+      "output_per_1m_gt_200k": 12.0,
+      "cached_input_per_1m_gt_200k": 1.0
+    },
+    "perplexity_orchestrator/xai/grok-4.6": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 6.0,
+      "cached_input_per_1m": 0.5,
+      "input_per_1m_gt_200k": 4.0,
+      "output_per_1m_gt_200k": 12.0,
+      "cached_input_per_1m_gt_200k": 1.0
+    },
+    "perplexity_orchestrator/xai/grok-4.5": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 2.0,
+      "output_per_1m": 6.0,
+      "cached_input_per_1m": 0.3,
+      "input_per_1m_gt_200k": 4.0,
+      "output_per_1m_gt_200k": 12.0,
+      "cached_input_per_1m_gt_200k": 0.6
+    },
+    "perplexity_orchestrator/perplexity/glm-5.3": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.4,
+      "output_per_1m": 4.4,
+      "cached_input_per_1m": 0.26
+    },
+    "perplexity_orchestrator/perplexity/glm-5.3-flash": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.5,
+      "cached_input_per_1m": 0.03
+    },
+    "perplexity_orchestrator/perplexity/deepseek-v4-pro-0813": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 1.32,
+      "output_per_1m": 3.96,
+      "cached_input_per_1m": 0.044
+    },
+    "perplexity_orchestrator/perplexity/kimi-k3": {
+      "provider": "perplexity_orchestrator",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3
+    },
+    "fireworks_ai/accounts/fireworks/routers/deepseek-v4p1-flash-1017-us": {
+      "provider": "fireworks_ai",
+      "input_per_1m": 0.45,
+      "output_per_1m": 1.8,
+      "cached_input_per_1m": 0.009
+    },
+    "bedrock_mantle/openai.gpt-6.2-sol": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.11
+    },
+    "bedrock_mantle/openai.gpt-6.2-astra": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 8.8,
+      "output_per_1m": 44.0,
+      "cached_input_per_1m": 0.44
+    },
+    "fireworks_ai/accounts/fireworks/routers/deepseek-v4p1-flash-1017-flex": {
+      "provider": "fireworks_ai",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.6,
+      "cached_input_per_1m": 0.003
+    },
+    "gmi/google/gemini-4-hydrogen": {
+      "provider": "gmi",
+      "input_per_1m": 1.5,
+      "output_per_1m": 7.5,
+      "cached_input_per_1m": 0.075
+    },
+    "omni-moderation-csam-latest": {
+      "provider": "openai",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "bedrock_mantle/anthropic.claude-fable-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 11.0,
+      "output_per_1m": 55.0,
+      "cached_input_per_1m": 1.1
+    },
+    "bedrock_mantle/anthropic.claude-mythos-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 11.0,
+      "output_per_1m": 55.0,
+      "cached_input_per_1m": 1.1
+    },
+    "bedrock_mantle/anthropic.claude-opus-4-7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "bedrock_mantle/anthropic.claude-opus-4-8": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "bedrock_mantle/anthropic.claude-opus-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "bedrock_mantle/anthropic.claude-sonnet-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.22
+    },
+    "bedrock/mantle/anthropic.claude-fable-5": {
+      "provider": "bedrock",
+      "input_per_1m": 11.0,
+      "output_per_1m": 55.0,
+      "cached_input_per_1m": 1.1
+    },
+    "bedrock/mantle/anthropic.claude-mythos-5": {
+      "provider": "bedrock",
+      "input_per_1m": 11.0,
+      "output_per_1m": 55.0,
+      "cached_input_per_1m": 1.1
+    },
+    "bedrock/mantle/anthropic.claude-opus-4-7": {
+      "provider": "bedrock",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "bedrock/mantle/anthropic.claude-opus-4-8": {
+      "provider": "bedrock",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "bedrock/mantle/anthropic.claude-opus-5": {
+      "provider": "bedrock",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "bedrock/mantle/anthropic.claude-sonnet-5": {
+      "provider": "bedrock",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.22
+    },
+    "bedrock/mantle/anthropic.claude-haiku-4-5": {
+      "provider": "bedrock",
+      "input_per_1m": 1.1,
+      "output_per_1m": 5.5,
+      "cached_input_per_1m": 0.11
+    },
+    "bedrock/mantle/anthropic.claude-opus-5-5": {
+      "provider": "bedrock",
+      "input_per_1m": 4.4,
+      "output_per_1m": 22.0,
+      "cached_input_per_1m": 0.22
+    },
+    "databricks/system.ai.gemini-4-hydrogen": {
+      "provider": "databricks",
+      "input_per_1m": 1.87502,
+      "output_per_1m": 9.37503,
+      "cached_input_per_1m": 0.09373
+    },
+    "gpt-6.2-astra": {
+      "provider": "openai",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "gpt-6.2-sol": {
+      "provider": "openai",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "gpt-6.2-astra-law": {
+      "provider": "openai",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "azure/gpt-6.2-astra": {
+      "provider": "azure",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "azure/us/gpt-6.2-astra": {
+      "provider": "azure",
+      "input_per_1m": 8.8,
+      "output_per_1m": 44.0,
+      "cached_input_per_1m": 0.44
+    },
+    "azure/eu/gpt-6.2-astra": {
+      "provider": "azure",
+      "input_per_1m": 9.6,
+      "output_per_1m": 48.0,
+      "cached_input_per_1m": 0.48
+    },
+    "azure/apac/gpt-6.2-astra": {
+      "provider": "azure",
+      "input_per_1m": 9.6,
+      "output_per_1m": 48.0,
+      "cached_input_per_1m": 0.48
+    },
+    "azure/gpt-6.2-sol": {
+      "provider": "azure",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "azure/us/gpt-6.2-sol": {
+      "provider": "azure",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.11
+    },
+    "azure/eu/gpt-6.2-sol": {
+      "provider": "azure",
+      "input_per_1m": 2.4,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.12
+    },
+    "azure/apac/gpt-6.2-sol": {
+      "provider": "azure",
+      "input_per_1m": 2.4,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.12
+    },
+    "azure_ai/kimi-k3.1-pro": {
+      "provider": "azure_ai",
+      "input_per_1m": 2.3,
+      "output_per_1m": 11.5,
+      "cached_input_per_1m": 0.23
+    },
+    "azure_ai/Microsoft-Decision-1.1": {
+      "provider": "azure_ai",
+      "input_per_1m": 0.042,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0105
+    },
+    "global.openai.gpt-6.2-astra": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "global.openai.gpt-6.2-sol": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "us.openai.gpt-6.2-astra": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 8.8,
+      "output_per_1m": 44.0,
+      "cached_input_per_1m": 0.44
+    },
+    "us.openai.gpt-6.2-sol": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.11
+    },
+    "openai.gpt-6.2-astra": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "openai.gpt-6.2-sol": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "github_copilot/mai-code-2": {
+      "provider": "github_copilot",
+      "input_per_1m": 0.5,
+      "output_per_1m": 2.5,
+      "cached_input_per_1m": 0.025
+    },
+    "github_copilot/mai-code-2-flash": {
+      "provider": "github_copilot",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.25,
+      "cached_input_per_1m": 0.005
+    },
+    "openrouter/deepseek/deepseek-v4-pro": {
+      "provider": "openrouter",
+      "input_per_1m": 0.9,
+      "output_per_1m": 1.5,
+      "cached_input_per_1m": 0.2
+    },
+    "openrouter/deepseek/deepseek-v4-flash": {
+      "provider": "openrouter",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.018
+    },
+    "openrouter/cloudflare/clef": {
+      "provider": "openrouter",
+      "input_per_1m": 0.192,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.048
+    },
+    "openrouter/cloudflare/clef-flash": {
+      "provider": "openrouter",
+      "input_per_1m": 0.019,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.00475
+    },
+    "openrouter/inception/mercury-decide": {
+      "provider": "openrouter",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "openrouter/inception/mercury-decide:free": {
+      "provider": "openrouter",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "openrouter/jaredpalmer/kev-4b": {
+      "provider": "openrouter",
+      "input_per_1m": 0.042,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0105
+    },
+    "openrouter/liquid/d1": {
+      "provider": "openrouter",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "openrouter/openai/gpt-6-luna-decisions": {
+      "provider": "openrouter",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.025
+    },
+    "openrouter/perplexity/pplx-decider-v1.1-27b": {
+      "provider": "openrouter",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "openrouter/respan/span-01": {
+      "provider": "openrouter",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "openrouter/respan/span-01-lite": {
+      "provider": "openrouter",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "openrouter/respan/span-01-lite:free": {
+      "provider": "openrouter",
+      "input_per_1m": 0.0,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0
+    },
+    "openrouter/togethercomputer/tev1-4b-experimental": {
+      "provider": "openrouter",
+      "input_per_1m": 0.042,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0105
+    },
+    "openrouter/upstage/solar-decide": {
+      "provider": "openrouter",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0125
+    },
+    "openrouter/upstage/solar-decide-flash": {
+      "provider": "openrouter",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0125
+    },
+    "openrouter/~typesafe/jev-latest": {
+      "provider": "openrouter",
+      "input_per_1m": 0.042,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0105
+    },
+    "github_copilot/gpt-6.2-astra": {
+      "provider": "github_copilot",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "github_copilot/gpt-6.2-sol": {
+      "provider": "github_copilot",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "together_ai/Qwen/Qwen4-Max": {
+      "provider": "together_ai",
+      "input_per_1m": 1.05,
+      "output_per_1m": 3.15,
+      "cached_input_per_1m": 0.0525
+    },
+    "azure/us-gov/gpt-4-turbo": {
+      "provider": "azure",
+      "input_per_1m": 12.5,
+      "output_per_1m": 37.5,
+      "cached_input_per_1m": 3.125
+    },
+    "azure/us-gov/gpt-4o-2024-05-13": {
+      "provider": "azure",
+      "input_per_1m": 6.25,
+      "output_per_1m": 18.75,
+      "cached_input_per_1m": 1.5625
+    },
+    "azure/us-gov/gpt-4o-2024-11-20": {
+      "provider": "azure",
+      "input_per_1m": 3.438,
+      "output_per_1m": 13.75,
+      "cached_input_per_1m": 1.719
+    },
+    "azure/us-gov/o3-mini-2025-01-31": {
+      "provider": "azure",
+      "input_per_1m": 1.513,
+      "output_per_1m": 6.05,
+      "cached_input_per_1m": 0.757
+    },
+    "bedrock/ap-east-2/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.36,
+      "output_per_1m": 3.01,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock/ap-northeast-1/amazon.nova-2-5-sonic": {
+      "provider": "bedrock",
+      "input_per_1m": 0.396,
+      "output_per_1m": 3.311,
+      "cached_input_per_1m": 0.099
+    },
+    "bedrock/ap-northeast-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.396,
+      "output_per_1m": 3.311,
+      "cached_input_per_1m": 0.099
+    },
+    "bedrock/ap-northeast-1/amazon.nova-2-sonic-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.396,
+      "output_per_1m": 3.311,
+      "cached_input_per_1m": 0.099
+    },
+    "bedrock/ap-northeast-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock/ap-northeast-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.042,
+      "output_per_1m": 0.168,
+      "cached_input_per_1m": 0.0105
+    },
+    "bedrock/ap-northeast-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.96,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.24
+    },
+    "bedrock/ap-northeast-1/apac.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock/ap-northeast-1/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.96,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.24
+    },
+    "bedrock/ap-northeast-1/deepseek.v3-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.701666,
+      "output_per_1m": 2.032411,
+      "cached_input_per_1m": 0.175417
+    },
+    "bedrock/ap-northeast-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.36,
+      "output_per_1m": 3.01,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock/ap-northeast-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/ap-northeast-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.28,
+      "output_per_1m": 0.46,
+      "cached_input_per_1m": 0.07
+    },
+    "bedrock/ap-northeast-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.1,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/ap-northeast-1/minimax.minimax-m2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.45,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock/ap-northeast-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/ap-northeast-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock/ap-northeast-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock/ap-northeast-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/ap-northeast-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-northeast-1/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock/ap-northeast-1/moonshot.kimi-k2-thinking": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.73,
+      "output_per_1m": 3.03,
+      "cached_input_per_1m": 0.1825
+    },
+    "bedrock/ap-northeast-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock/ap-northeast-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.29,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/ap-northeast-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/ap-northeast-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-northeast-1/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-northeast-1/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-northeast-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-northeast-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-northeast-1/qwen.qwen3-235b-a22b-2507-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.27,
+      "output_per_1m": 1.06,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock/ap-northeast-1/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-northeast-1/qwen.qwen3-coder-480b-a35b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.54,
+      "output_per_1m": 2.18,
+      "cached_input_per_1m": 0.135
+    },
+    "bedrock/ap-northeast-1/qwen.qwen3-vl-235b-a22b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.64,
+      "output_per_1m": 3.22,
+      "cached_input_per_1m": 0.16
+    },
+    "bedrock/ap-northeast-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-northeast-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/ap-northeast-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-northeast-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/ap-northeast-2/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.071,
+      "output_per_1m": 0.284,
+      "cached_input_per_1m": 0.01775
+    },
+    "bedrock/ap-northeast-2/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.041,
+      "output_per_1m": 0.164,
+      "cached_input_per_1m": 0.01025
+    },
+    "bedrock/ap-northeast-2/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.95,
+      "output_per_1m": 3.8,
+      "cached_input_per_1m": 0.2375
+    },
+    "bedrock/ap-northeast-2/apac.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.071,
+      "output_per_1m": 0.284,
+      "cached_input_per_1m": 0.01775
+    },
+    "bedrock/ap-northeast-2/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.95,
+      "output_per_1m": 3.8,
+      "cached_input_per_1m": 0.2375
+    },
+    "bedrock/ap-northeast-2/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.36,
+      "output_per_1m": 2.96,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock/ap-south-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.071,
+      "output_per_1m": 0.284,
+      "cached_input_per_1m": 0.01775
+    },
+    "bedrock/ap-south-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.041,
+      "output_per_1m": 0.164,
+      "cached_input_per_1m": 0.01025
+    },
+    "bedrock/ap-south-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.94,
+      "output_per_1m": 3.76,
+      "cached_input_per_1m": 0.235
+    },
+    "bedrock/ap-south-1/apac.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.071,
+      "output_per_1m": 0.284,
+      "cached_input_per_1m": 0.01775
+    },
+    "bedrock/ap-south-1/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.94,
+      "output_per_1m": 3.76,
+      "cached_input_per_1m": 0.235
+    },
+    "bedrock/ap-south-1/deepseek.v3-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.682424,
+      "output_per_1m": 1.976678,
+      "cached_input_per_1m": 0.170606
+    },
+    "bedrock/ap-south-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.35,
+      "output_per_1m": 2.95,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock/ap-south-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/ap-south-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.27,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock/ap-south-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.09,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/ap-south-1/minimax.minimax-m2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.35,
+      "output_per_1m": 1.41,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock/ap-south-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/ap-south-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock/ap-south-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock/ap-south-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/ap-south-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/mistral.mistral-7b-instruct-v0:2": {
+      "provider": "bedrock",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/mistral.mistral-large-2402-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 4.8,
+      "output_per_1m": 14.4,
+      "cached_input_per_1m": 1.2
+    },
+    "bedrock/ap-south-1/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock/ap-south-1/mistral.mixtral-8x7b-instruct-v0:1": {
+      "provider": "bedrock",
+      "input_per_1m": 0.54,
+      "output_per_1m": 0.84,
+      "cached_input_per_1m": 0.135
+    },
+    "bedrock/ap-south-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/ap-south-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/ap-south-1/moonshot.kimi-k2-thinking": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.71,
+      "output_per_1m": 2.94,
+      "cached_input_per_1m": 0.1775
+    },
+    "bedrock/ap-south-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock/ap-south-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/ap-south-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.27,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/ap-south-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-south-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-south-1/qwen.qwen3-235b-a22b-2507-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.26,
+      "output_per_1m": 1.04,
+      "cached_input_per_1m": 0.065
+    },
+    "bedrock/ap-south-1/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/qwen.qwen3-coder-480b-a35b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.53,
+      "output_per_1m": 2.12,
+      "cached_input_per_1m": 0.1325
+    },
+    "bedrock/ap-south-1/qwen.qwen3-vl-235b-a22b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.13,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock/ap-south-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-south-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/ap-south-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-south-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/ap-southeast-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.081,
+      "output_per_1m": 0.324,
+      "cached_input_per_1m": 0.02025
+    },
+    "bedrock/ap-southeast-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.047,
+      "output_per_1m": 0.188,
+      "cached_input_per_1m": 0.01175
+    },
+    "bedrock/ap-southeast-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.08,
+      "output_per_1m": 4.32,
+      "cached_input_per_1m": 0.27
+    },
+    "bedrock/ap-southeast-1/apac.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.081,
+      "output_per_1m": 0.324,
+      "cached_input_per_1m": 0.02025
+    },
+    "bedrock/ap-southeast-1/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.08,
+      "output_per_1m": 4.32,
+      "cached_input_per_1m": 0.27
+    },
+    "bedrock/ap-southeast-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.41,
+      "output_per_1m": 3.39,
+      "cached_input_per_1m": 0.1025
+    },
+    "bedrock/ap-southeast-2/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.063,
+      "output_per_1m": 0.252,
+      "cached_input_per_1m": 0.01575
+    },
+    "bedrock/ap-southeast-2/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.037,
+      "output_per_1m": 0.148,
+      "cached_input_per_1m": 0.00925
+    },
+    "bedrock/ap-southeast-2/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.84,
+      "output_per_1m": 3.36,
+      "cached_input_per_1m": 0.21
+    },
+    "bedrock/ap-southeast-2/deepseek.v3.2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.64,
+      "output_per_1m": 1.91,
+      "cached_input_per_1m": 0.16
+    },
+    "bedrock/ap-southeast-2/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.32,
+      "output_per_1m": 2.63,
+      "cached_input_per_1m": 0.08
+    },
+    "bedrock/ap-southeast-2/minimax.minimax-m2.1": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.31,
+      "output_per_1m": 1.24,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock/ap-southeast-2/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.41,
+      "output_per_1m": 2.06,
+      "cached_input_per_1m": 0.1025
+    },
+    "bedrock/ap-southeast-2/mistral.mistral-7b-instruct-v0:2": {
+      "provider": "bedrock",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.26,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/ap-southeast-2/mistral.mistral-large-2402-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 5.2,
+      "output_per_1m": 15.6,
+      "cached_input_per_1m": 1.3
+    },
+    "bedrock/ap-southeast-2/mistral.mixtral-8x7b-instruct-v0:1": {
+      "provider": "bedrock",
+      "input_per_1m": 0.59,
+      "output_per_1m": 0.91,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock/ap-southeast-2/moonshotai.kimi-k2.5": {
+      "provider": "bedrock",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.09,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock/ap-southeast-2/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.67,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock/ap-southeast-2/qwen.qwen3-coder-next": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.52,
+      "output_per_1m": 1.24,
+      "cached_input_per_1m": 0.13
+    },
+    "bedrock/ap-southeast-2/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock/ap-southeast-2/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.62,
+      "output_per_1m": 2.27,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock/ap-southeast-2/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.41,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/ap-southeast-2/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.03,
+      "output_per_1m": 3.3,
+      "cached_input_per_1m": 0.2575
+    },
+    "bedrock/ap-southeast-3/deepseek.v3-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.74,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock/ap-southeast-3/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.32,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.08
+    },
+    "bedrock/ap-southeast-3/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/ap-southeast-3/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-southeast-3/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock/ap-southeast-3/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.31,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/ap-southeast-3/qwen.qwen3-235b-a22b-2507-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.91,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/ap-southeast-3/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock/ap-southeast-3/qwen.qwen3-coder-480b-a35b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.47,
+      "output_per_1m": 1.87,
+      "cached_input_per_1m": 0.1175
+    },
+    "bedrock/ap-southeast-3/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/ap-southeast-3/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/ap-southeast-3/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/ap-southeast-3/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/ap-southeast-4/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.065,
+      "output_per_1m": 0.26,
+      "cached_input_per_1m": 0.01625
+    },
+    "bedrock/ap-southeast-4/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.87,
+      "output_per_1m": 3.48,
+      "cached_input_per_1m": 0.2175
+    },
+    "bedrock/ap-southeast-4/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.87,
+      "output_per_1m": 3.48,
+      "cached_input_per_1m": 0.2175
+    },
+    "bedrock/ap-southeast-4/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.33,
+      "output_per_1m": 2.71,
+      "cached_input_per_1m": 0.0825
+    },
+    "bedrock/ap-southeast-5/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock/ap-southeast-5/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.41,
+      "output_per_1m": 3.39,
+      "cached_input_per_1m": 0.1025
+    },
+    "bedrock/ap-southeast-6/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.32,
+      "output_per_1m": 2.63,
+      "cached_input_per_1m": 0.08
+    },
+    "bedrock/ap-southeast-7/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock/ap-southeast-7/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.41,
+      "output_per_1m": 3.39,
+      "cached_input_per_1m": 0.1025
+    },
+    "bedrock/ca-central-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.352,
+      "output_per_1m": 2.97,
+      "cached_input_per_1m": 0.088
+    },
+    "bedrock/ca-central-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.064,
+      "output_per_1m": 0.256,
+      "cached_input_per_1m": 0.016
+    },
+    "bedrock/ca-central-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.32,
+      "output_per_1m": 2.67,
+      "cached_input_per_1m": 0.08
+    },
+    "bedrock/ca-central-1/mistral.mistral-7b-instruct-v0:2": {
+      "provider": "bedrock",
+      "input_per_1m": 0.17,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0425
+    },
+    "bedrock/ca-central-1/mistral.mistral-large-2402-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 4.6,
+      "output_per_1m": 13.8,
+      "cached_input_per_1m": 1.15
+    },
+    "bedrock/ca-central-1/mistral.mixtral-8x7b-instruct-v0:1": {
+      "provider": "bedrock",
+      "input_per_1m": 0.52,
+      "output_per_1m": 0.81,
+      "cached_input_per_1m": 0.13
+    },
+    "bedrock/ca-west-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.374,
+      "output_per_1m": 3.091,
+      "cached_input_per_1m": 0.0935
+    },
+    "bedrock/ca-west-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.34,
+      "output_per_1m": 2.81,
+      "cached_input_per_1m": 0.085
+    },
+    "bedrock/eu-central-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.429,
+      "output_per_1m": 3.597,
+      "cached_input_per_1m": 0.10725
+    },
+    "bedrock/eu-central-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.078,
+      "output_per_1m": 0.312,
+      "cached_input_per_1m": 0.0195
+    },
+    "bedrock/eu-central-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.046,
+      "output_per_1m": 0.184,
+      "cached_input_per_1m": 0.0115
+    },
+    "bedrock/eu-central-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.05,
+      "output_per_1m": 4.2,
+      "cached_input_per_1m": 0.2625
+    },
+    "bedrock/eu-central-1/deepseek.v3.2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock/eu-central-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.39,
+      "output_per_1m": 3.27,
+      "cached_input_per_1m": 0.0975
+    },
+    "bedrock/eu-central-1/meta.llama3-2-1b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.13,
+      "output_per_1m": 0.13,
+      "cached_input_per_1m": 0.0325
+    },
+    "bedrock/eu-central-1/meta.llama3-2-3b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.19,
+      "output_per_1m": 0.19,
+      "cached_input_per_1m": 0.0475
+    },
+    "bedrock/eu-central-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/eu-central-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-central-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-central-1/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/eu-central-1/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock/eu-central-1/qwen.qwen3-235b-a22b-2507-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.29,
+      "output_per_1m": 1.16,
+      "cached_input_per_1m": 0.0725
+    },
+    "bedrock/eu-central-1/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/eu-central-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-central-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-central-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-central-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/eu-north-1/amazon.nova-2-5-sonic": {
+      "provider": "bedrock",
+      "input_per_1m": 0.363,
+      "output_per_1m": 2.992,
+      "cached_input_per_1m": 0.09075
+    },
+    "bedrock/eu-north-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.363,
+      "output_per_1m": 2.992,
+      "cached_input_per_1m": 0.09075
+    },
+    "bedrock/eu-north-1/amazon.nova-2-sonic-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.363,
+      "output_per_1m": 2.992,
+      "cached_input_per_1m": 0.09075
+    },
+    "bedrock/eu-north-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.065,
+      "output_per_1m": 0.26,
+      "cached_input_per_1m": 0.01625
+    },
+    "bedrock/eu-north-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.038,
+      "output_per_1m": 0.152,
+      "cached_input_per_1m": 0.0095
+    },
+    "bedrock/eu-north-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.87,
+      "output_per_1m": 3.48,
+      "cached_input_per_1m": 0.2175
+    },
+    "bedrock/eu-north-1/eu.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.363,
+      "output_per_1m": 2.992,
+      "cached_input_per_1m": 0.09075
+    },
+    "bedrock/eu-north-1/eu.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.065,
+      "output_per_1m": 0.26,
+      "cached_input_per_1m": 0.01625
+    },
+    "bedrock/eu-north-1/eu.amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.038,
+      "output_per_1m": 0.152,
+      "cached_input_per_1m": 0.0095
+    },
+    "bedrock/eu-north-1/eu.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.87,
+      "output_per_1m": 3.48,
+      "cached_input_per_1m": 0.2175
+    },
+    "bedrock/eu-north-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.33,
+      "output_per_1m": 2.72,
+      "cached_input_per_1m": 0.0825
+    },
+    "bedrock/eu-north-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/eu-north-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-north-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock/eu-north-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-north-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-north-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-north-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/eu-south-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.528,
+      "output_per_1m": 4.411,
+      "cached_input_per_1m": 0.132
+    },
+    "bedrock/eu-south-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.096,
+      "output_per_1m": 0.384,
+      "cached_input_per_1m": 0.024
+    },
+    "bedrock/eu-south-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.056,
+      "output_per_1m": 0.224,
+      "cached_input_per_1m": 0.014
+    },
+    "bedrock/eu-south-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.28,
+      "output_per_1m": 5.21,
+      "cached_input_per_1m": 0.32
+    },
+    "bedrock/eu-south-1/deepseek.v3.2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock/eu-south-1/eu.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.528,
+      "output_per_1m": 4.411,
+      "cached_input_per_1m": 0.132
+    },
+    "bedrock/eu-south-1/eu.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.096,
+      "output_per_1m": 0.384,
+      "cached_input_per_1m": 0.024
+    },
+    "bedrock/eu-south-1/eu.amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.056,
+      "output_per_1m": 0.224,
+      "cached_input_per_1m": 0.014
+    },
+    "bedrock/eu-south-1/eu.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.28,
+      "output_per_1m": 5.21,
+      "cached_input_per_1m": 0.32
+    },
+    "bedrock/eu-south-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.481,
+      "output_per_1m": 4.1,
+      "cached_input_per_1m": 0.12025
+    },
+    "bedrock/eu-south-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-south-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.27,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock/eu-south-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.09,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/eu-south-1/minimax.minimax-m2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.35,
+      "output_per_1m": 1.41,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock/eu-south-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/eu-south-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock/eu-south-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-south-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/eu-south-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-south-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/eu-south-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/eu-south-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-south-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-south-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/eu-south-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.27,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/eu-south-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-south-1/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/eu-south-1/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock/eu-south-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-south-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-south-1/qwen.qwen3-235b-a22b-2507-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.29,
+      "output_per_1m": 1.16,
+      "cached_input_per_1m": 0.0725
+    },
+    "bedrock/eu-south-1/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/eu-south-1/qwen.qwen3-vl-235b-a22b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.12,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock/eu-south-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-south-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-south-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-south-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/eu-south-2/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.363,
+      "output_per_1m": 3.205,
+      "cached_input_per_1m": 0.09075
+    },
+    "bedrock/eu-south-2/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.066,
+      "output_per_1m": 0.264,
+      "cached_input_per_1m": 0.0165
+    },
+    "bedrock/eu-south-2/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.039,
+      "output_per_1m": 0.156,
+      "cached_input_per_1m": 0.00975
+    },
+    "bedrock/eu-south-2/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.88,
+      "output_per_1m": 3.52,
+      "cached_input_per_1m": 0.22
+    },
+    "bedrock/eu-south-2/eu.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.363,
+      "output_per_1m": 3.205,
+      "cached_input_per_1m": 0.09075
+    },
+    "bedrock/eu-south-2/eu.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.066,
+      "output_per_1m": 0.264,
+      "cached_input_per_1m": 0.0165
+    },
+    "bedrock/eu-south-2/eu.amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.039,
+      "output_per_1m": 0.156,
+      "cached_input_per_1m": 0.00975
+    },
+    "bedrock/eu-south-2/eu.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.88,
+      "output_per_1m": 3.52,
+      "cached_input_per_1m": 0.22
+    },
+    "bedrock/eu-south-2/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.33,
+      "output_per_1m": 2.75,
+      "cached_input_per_1m": 0.0825
+    },
+    "bedrock/eu-west-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.374,
+      "output_per_1m": 3.157,
+      "cached_input_per_1m": 0.0935
+    },
+    "bedrock/eu-west-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.069,
+      "output_per_1m": 0.276,
+      "cached_input_per_1m": 0.01725
+    },
+    "bedrock/eu-west-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.04,
+      "output_per_1m": 0.16,
+      "cached_input_per_1m": 0.01
+    },
+    "bedrock/eu-west-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.92,
+      "output_per_1m": 3.68,
+      "cached_input_per_1m": 0.23
+    },
+    "bedrock/eu-west-1/deepseek.v3.2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock/eu-west-1/eu.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.374,
+      "output_per_1m": 3.157,
+      "cached_input_per_1m": 0.0935
+    },
+    "bedrock/eu-west-1/eu.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.069,
+      "output_per_1m": 0.276,
+      "cached_input_per_1m": 0.01725
+    },
+    "bedrock/eu-west-1/eu.amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.04,
+      "output_per_1m": 0.16,
+      "cached_input_per_1m": 0.01
+    },
+    "bedrock/eu-west-1/eu.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.92,
+      "output_per_1m": 3.68,
+      "cached_input_per_1m": 0.23
+    },
+    "bedrock/eu-west-1/eu.meta.llama3-2-1b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.11,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-west-1/eu.meta.llama3-2-3b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.17,
+      "output_per_1m": 0.17,
+      "cached_input_per_1m": 0.0425
+    },
+    "bedrock/eu-west-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.34,
+      "output_per_1m": 2.87,
+      "cached_input_per_1m": 0.085
+    },
+    "bedrock/eu-west-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-west-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.27,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock/eu-west-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.09,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/eu-west-1/meta.llama3-2-1b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.11,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-west-1/meta.llama3-2-3b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.17,
+      "output_per_1m": 0.17,
+      "cached_input_per_1m": 0.0425
+    },
+    "bedrock/eu-west-1/minimax.minimax-m2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.35,
+      "output_per_1m": 1.41,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock/eu-west-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/eu-west-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock/eu-west-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/eu-west-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-west-1/mistral.mistral-7b-instruct-v0:2": {
+      "provider": "bedrock",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.22,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock/eu-west-1/mistral.mistral-large-2402-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 4.3,
+      "output_per_1m": 13.0,
+      "cached_input_per_1m": 1.075
+    },
+    "bedrock/eu-west-1/mistral.mixtral-8x7b-instruct-v0:1": {
+      "provider": "bedrock",
+      "input_per_1m": 0.49,
+      "output_per_1m": 0.76,
+      "cached_input_per_1m": 0.1225
+    },
+    "bedrock/eu-west-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/eu-west-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/eu-west-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-west-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/eu-west-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.27,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/eu-west-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-west-1/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-west-1/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-west-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-west-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-west-1/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-west-1/qwen.qwen3-vl-235b-a22b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.12,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock/eu-west-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/eu-west-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/eu-west-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/eu-west-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/eu-west-2/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.084,
+      "output_per_1m": 0.336,
+      "cached_input_per_1m": 0.021
+    },
+    "bedrock/eu-west-2/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.049,
+      "output_per_1m": 0.196,
+      "cached_input_per_1m": 0.01225
+    },
+    "bedrock/eu-west-2/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.13,
+      "output_per_1m": 4.52,
+      "cached_input_per_1m": 0.2825
+    },
+    "bedrock/eu-west-2/deepseek.v3-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.899985,
+      "output_per_1m": 2.606853,
+      "cached_input_per_1m": 0.224996
+    },
+    "bedrock/eu-west-2/deepseek.v3.2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.961,
+      "output_per_1m": 2.8675,
+      "cached_input_per_1m": 0.24025
+    },
+    "bedrock/eu-west-2/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.42,
+      "output_per_1m": 3.52,
+      "cached_input_per_1m": 0.105
+    },
+    "bedrock/eu-west-2/google.gemma-3-12b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.14,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.035
+    },
+    "bedrock/eu-west-2/google.gemma-3-27b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.36,
+      "output_per_1m": 0.59,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock/eu-west-2/google.gemma-3-4b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock/eu-west-2/minimax.minimax-m2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.47,
+      "output_per_1m": 1.86,
+      "cached_input_per_1m": 0.1175
+    },
+    "bedrock/eu-west-2/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.1,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock/eu-west-2/mistral.magistral-small-2509": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.78,
+      "output_per_1m": 2.33,
+      "cached_input_per_1m": 0.195
+    },
+    "bedrock/eu-west-2/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.31,
+      "output_per_1m": 0.31,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock/eu-west-2/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.16,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock/eu-west-2/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-2/mistral.mistral-7b-instruct-v0:2": {
+      "provider": "bedrock",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.26,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/eu-west-2/mistral.mistral-large-2402-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 5.2,
+      "output_per_1m": 15.6,
+      "cached_input_per_1m": 1.3
+    },
+    "bedrock/eu-west-2/mistral.mixtral-8x7b-instruct-v0:1": {
+      "provider": "bedrock",
+      "input_per_1m": 0.59,
+      "output_per_1m": 0.91,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock/eu-west-2/moonshotai.kimi-k2.5": {
+      "provider": "bedrock",
+      "input_per_1m": 0.93,
+      "output_per_1m": 4.65,
+      "cached_input_per_1m": 0.2325
+    },
+    "bedrock/eu-west-2/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.31,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock/eu-west-2/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.37,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock/eu-west-2/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock/eu-west-2/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-2/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.47,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-west-2/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-2/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.31,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-west-2/qwen.qwen3-235b-a22b-2507-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.34,
+      "output_per_1m": 1.37,
+      "cached_input_per_1m": 0.085
+    },
+    "bedrock/eu-west-2/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-2/qwen.qwen3-coder-480b-a35b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.7,
+      "output_per_1m": 2.79,
+      "cached_input_per_1m": 0.175
+    },
+    "bedrock/eu-west-2/qwen.qwen3-vl-235b-a22b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.82,
+      "output_per_1m": 4.12,
+      "cached_input_per_1m": 0.205
+    },
+    "bedrock/eu-west-2/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock/eu-west-2/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.93,
+      "output_per_1m": 3.41,
+      "cached_input_per_1m": 0.2325
+    },
+    "bedrock/eu-west-2/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/eu-west-2/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.55,
+      "output_per_1m": 4.96,
+      "cached_input_per_1m": 0.3875
+    },
+    "bedrock/eu-west-3/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.484,
+      "output_per_1m": 4.059,
+      "cached_input_per_1m": 0.121
+    },
+    "bedrock/eu-west-3/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.088,
+      "output_per_1m": 0.352,
+      "cached_input_per_1m": 0.022
+    },
+    "bedrock/eu-west-3/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.052,
+      "output_per_1m": 0.208,
+      "cached_input_per_1m": 0.013
+    },
+    "bedrock/eu-west-3/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.18,
+      "output_per_1m": 4.72,
+      "cached_input_per_1m": 0.295
+    },
+    "bedrock/eu-west-3/eu.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.484,
+      "output_per_1m": 4.059,
+      "cached_input_per_1m": 0.121
+    },
+    "bedrock/eu-west-3/eu.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.088,
+      "output_per_1m": 0.352,
+      "cached_input_per_1m": 0.022
+    },
+    "bedrock/eu-west-3/eu.amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.052,
+      "output_per_1m": 0.208,
+      "cached_input_per_1m": 0.013
+    },
+    "bedrock/eu-west-3/eu.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.18,
+      "output_per_1m": 4.72,
+      "cached_input_per_1m": 0.295
+    },
+    "bedrock/eu-west-3/eu.meta.llama3-2-3b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.2,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/eu-west-3/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.44,
+      "output_per_1m": 3.69,
+      "cached_input_per_1m": 0.11
+    },
+    "bedrock/eu-west-3/meta.llama3-2-1b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.13,
+      "output_per_1m": 0.13,
+      "cached_input_per_1m": 0.0325
+    },
+    "bedrock/eu-west-3/meta.llama3-2-3b-instruct-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.2,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock/il-central-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.075,
+      "output_per_1m": 0.3,
+      "cached_input_per_1m": 0.01875
+    },
+    "bedrock/il-central-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.044,
+      "output_per_1m": 0.176,
+      "cached_input_per_1m": 0.011
+    },
+    "bedrock/il-central-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.0,
+      "output_per_1m": 4.0,
+      "cached_input_per_1m": 0.25
+    },
+    "bedrock/il-central-1/apac.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.075,
+      "output_per_1m": 0.3,
+      "cached_input_per_1m": 0.01875
+    },
+    "bedrock/il-central-1/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.0,
+      "output_per_1m": 4.0,
+      "cached_input_per_1m": 0.25
+    },
+    "bedrock/il-central-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.38,
+      "output_per_1m": 3.13,
+      "cached_input_per_1m": 0.095
+    },
+    "bedrock/me-central-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock/me-central-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.035,
+      "output_per_1m": 0.14,
+      "cached_input_per_1m": 0.00875
+    },
+    "bedrock/me-central-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.8,
+      "output_per_1m": 3.2,
+      "cached_input_per_1m": 0.2
+    },
+    "bedrock/me-central-1/apac.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.8,
+      "output_per_1m": 3.2,
+      "cached_input_per_1m": 0.2
+    },
+    "bedrock/sa-east-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock/sa-east-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.28,
+      "output_per_1m": 0.46,
+      "cached_input_per_1m": 0.07
+    },
+    "bedrock/sa-east-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.1,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/sa-east-1/minimax.minimax-m2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.45,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock/sa-east-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock/sa-east-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock/sa-east-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock/sa-east-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/sa-east-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/sa-east-1/mistral.mistral-7b-instruct-v0:2": {
+      "provider": "bedrock",
+      "input_per_1m": 0.25,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0625
+    },
+    "bedrock/sa-east-1/mistral.mistral-large-2402-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 6.7,
+      "output_per_1m": 20.2,
+      "cached_input_per_1m": 1.675
+    },
+    "bedrock/sa-east-1/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock/sa-east-1/mistral.mixtral-8x7b-instruct-v0:1": {
+      "provider": "bedrock",
+      "input_per_1m": 0.76,
+      "output_per_1m": 1.18,
+      "cached_input_per_1m": 0.19
+    },
+    "bedrock/sa-east-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock/sa-east-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock/sa-east-1/moonshot.kimi-k2-thinking": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.73,
+      "output_per_1m": 3.03,
+      "cached_input_per_1m": 0.1825
+    },
+    "bedrock/sa-east-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock/sa-east-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.29,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/sa-east-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock/sa-east-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/sa-east-1/openai.gpt-oss-120b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/sa-east-1/openai.gpt-oss-20b-1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/sa-east-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/sa-east-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/sa-east-1/qwen.qwen3-32b-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/sa-east-1/qwen.qwen3-vl-235b-a22b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.64,
+      "output_per_1m": 3.22,
+      "cached_input_per_1m": 0.16
+    },
+    "bedrock/sa-east-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock/sa-east-1/zai.glm-4.7": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock/sa-east-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock/sa-east-1/zai.glm-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock/us-east-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.33,
+      "output_per_1m": 2.75,
+      "cached_input_per_1m": 0.0825
+    },
+    "bedrock/us-east-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock/us-east-1/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.035,
+      "output_per_1m": 0.14,
+      "cached_input_per_1m": 0.00875
+    },
+    "bedrock/us-east-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.8,
+      "output_per_1m": 3.2,
+      "cached_input_per_1m": 0.2
+    },
+    "bedrock/us-east-2/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.33,
+      "output_per_1m": 2.75,
+      "cached_input_per_1m": 0.0825
+    },
+    "bedrock/us-east-2/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock/us-east-2/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.035,
+      "output_per_1m": 0.14,
+      "cached_input_per_1m": 0.00875
+    },
+    "bedrock/us-east-2/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.8,
+      "output_per_1m": 3.2,
+      "cached_input_per_1m": 0.2
+    },
+    "bedrock/us-west-1/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.429,
+      "output_per_1m": 3.351,
+      "cached_input_per_1m": 0.10725
+    },
+    "bedrock/us-west-1/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.077,
+      "output_per_1m": 0.308,
+      "cached_input_per_1m": 0.01925
+    },
+    "bedrock/us-west-1/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.03,
+      "output_per_1m": 4.12,
+      "cached_input_per_1m": 0.2575
+    },
+    "bedrock/us-west-1/global.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.39,
+      "output_per_1m": 3.21,
+      "cached_input_per_1m": 0.0975
+    },
+    "bedrock/us-west-1/us.amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.429,
+      "output_per_1m": 3.351,
+      "cached_input_per_1m": 0.10725
+    },
+    "bedrock/us-west-1/us.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.077,
+      "output_per_1m": 0.308,
+      "cached_input_per_1m": 0.01925
+    },
+    "bedrock/us-west-1/us.amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 1.03,
+      "output_per_1m": 4.12,
+      "cached_input_per_1m": 0.2575
+    },
+    "bedrock/us-west-2/amazon.nova-2-5-sonic": {
+      "provider": "bedrock",
+      "input_per_1m": 0.319,
+      "output_per_1m": 2.651,
+      "cached_input_per_1m": 0.07975
+    },
+    "bedrock/us-west-2/amazon.nova-2-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.33,
+      "output_per_1m": 2.75,
+      "cached_input_per_1m": 0.0825
+    },
+    "bedrock/us-west-2/amazon.nova-2-sonic-v1:0": {
+      "provider": "bedrock",
+      "input_per_1m": 0.319,
+      "output_per_1m": 2.651,
+      "cached_input_per_1m": 0.07975
+    },
+    "bedrock/us-west-2/amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock/us-west-2/amazon.nova-micro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.035,
+      "output_per_1m": 0.14,
+      "cached_input_per_1m": 0.00875
+    },
+    "bedrock/us-west-2/amazon.nova-pro-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.8,
+      "output_per_1m": 3.2,
+      "cached_input_per_1m": 0.2
+    },
+    "ca.amazon.nova-lite-v1:0": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.064,
+      "output_per_1m": 0.256,
+      "cached_input_per_1m": 0.016
+    },
+    "ca.anthropic.claude-haiku-5-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.55,
+      "cached_input_per_1m": 0.011
+    },
+    "ca.anthropic.claude-sonnet-5-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.11
+    },
+    "in.anthropic.claude-opus-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 5.5,
+      "output_per_1m": 27.5,
+      "cached_input_per_1m": 0.55
+    },
+    "in.anthropic.claude-sonnet-5": {
+      "provider": "bedrock_converse",
+      "input_per_1m": 2.2,
+      "output_per_1m": 11.0,
+      "cached_input_per_1m": 0.22
+    },
+    "in.openai.gpt-5.6-luna": {
+      "provider": "bedrock",
+      "input_per_1m": 0.22,
+      "output_per_1m": 1.32,
+      "cached_input_per_1m": 0.022
+    },
+    "in.openai.gpt-5.6-terra": {
+      "provider": "bedrock",
+      "input_per_1m": 2.2,
+      "output_per_1m": 13.2,
+      "cached_input_per_1m": 0.22
+    },
+    "bedrock_mantle/ap-northeast-1/deepseek.v3.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.701666,
+      "output_per_1m": 2.032411,
+      "cached_input_per_1m": 0.175417
+    },
+    "bedrock_mantle/ap-northeast-1/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock_mantle/ap-northeast-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/ap-northeast-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.28,
+      "output_per_1m": 0.46,
+      "cached_input_per_1m": 0.07
+    },
+    "bedrock_mantle/ap-northeast-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.1,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/ap-northeast-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.45,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-northeast-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-northeast-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/ap-northeast-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/ap-northeast-1/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.73,
+      "output_per_1m": 3.03,
+      "cached_input_per_1m": 0.1825
+    },
+    "bedrock_mantle/ap-northeast-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-northeast-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/ap-northeast-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.29,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/ap-northeast-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/ap-northeast-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-northeast-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.27,
+      "output_per_1m": 1.06,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-coder-480b-a35b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.54,
+      "output_per_1m": 2.18,
+      "cached_input_per_1m": 0.135
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/ap-northeast-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.64,
+      "output_per_1m": 3.22,
+      "cached_input_per_1m": 0.16
+    },
+    "bedrock_mantle/ap-northeast-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-northeast-1/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-northeast-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-northeast-1/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock_mantle/ap-south-1/deepseek.v3.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.682424,
+      "output_per_1m": 1.976678,
+      "cached_input_per_1m": 0.170606
+    },
+    "bedrock_mantle/ap-south-1/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock_mantle/ap-south-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/ap-south-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.27,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock_mantle/ap-south-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.09,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/ap-south-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.35,
+      "output_per_1m": 1.41,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock_mantle/ap-south-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-south-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-south-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/ap-south-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock_mantle/ap-south-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/ap-south-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/ap-south-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock_mantle/ap-south-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/ap-south-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/ap-south-1/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.71,
+      "output_per_1m": 2.94,
+      "cached_input_per_1m": 0.1775
+    },
+    "bedrock_mantle/ap-south-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-south-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/ap-south-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/ap-south-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.27,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/ap-south-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-south-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.26,
+      "output_per_1m": 1.04,
+      "cached_input_per_1m": 0.065
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.71,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-coder-480b-a35b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.53,
+      "output_per_1m": 2.12,
+      "cached_input_per_1m": 0.1325
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/ap-south-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.13,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/ap-south-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-south-1/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-south-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-south-1/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock_mantle/ap-southeast-2/deepseek.v3.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.5974,
+      "output_per_1m": 1.7304,
+      "cached_input_per_1m": 0.14935
+    },
+    "bedrock_mantle/ap-southeast-2/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.64,
+      "output_per_1m": 1.91,
+      "cached_input_per_1m": 0.16
+    },
+    "bedrock_mantle/ap-southeast-2/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0927,
+      "output_per_1m": 0.2987,
+      "cached_input_per_1m": 0.023175
+    },
+    "bedrock_mantle/ap-southeast-2/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2369,
+      "output_per_1m": 0.3914,
+      "cached_input_per_1m": 0.059225
+    },
+    "bedrock_mantle/ap-southeast-2/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0412,
+      "output_per_1m": 0.0824,
+      "cached_input_per_1m": 0.0103
+    },
+    "bedrock_mantle/ap-southeast-2/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.309,
+      "output_per_1m": 1.236,
+      "cached_input_per_1m": 0.07725
+    },
+    "bedrock_mantle/ap-southeast-2/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.31,
+      "output_per_1m": 1.24,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock_mantle/ap-southeast-2/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.31,
+      "output_per_1m": 1.24,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.41,
+      "output_per_1m": 2.06,
+      "cached_input_per_1m": 0.1025
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.515,
+      "output_per_1m": 1.545,
+      "cached_input_per_1m": 0.12875
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.206,
+      "output_per_1m": 0.206,
+      "cached_input_per_1m": 0.0515
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.103,
+      "output_per_1m": 0.103,
+      "cached_input_per_1m": 0.02575
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1545,
+      "output_per_1m": 0.1545,
+      "cached_input_per_1m": 0.038625
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.515,
+      "output_per_1m": 1.545,
+      "cached_input_per_1m": 0.12875
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0412,
+      "output_per_1m": 0.0412,
+      "cached_input_per_1m": 0.0103
+    },
+    "bedrock_mantle/ap-southeast-2/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.103,
+      "output_per_1m": 0.309,
+      "cached_input_per_1m": 0.02575
+    },
+    "bedrock_mantle/ap-southeast-2/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.618,
+      "output_per_1m": 2.575,
+      "cached_input_per_1m": 0.1545
+    },
+    "bedrock_mantle/ap-southeast-2/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.09,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/ap-southeast-2/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.206,
+      "output_per_1m": 0.618,
+      "cached_input_per_1m": 0.0515
+    },
+    "bedrock_mantle/ap-southeast-2/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0618,
+      "output_per_1m": 0.2472,
+      "cached_input_per_1m": 0.01545
+    },
+    "bedrock_mantle/ap-southeast-2/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0618,
+      "output_per_1m": 0.2369,
+      "cached_input_per_1m": 0.01545
+    },
+    "bedrock_mantle/ap-southeast-2/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.67,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock_mantle/ap-southeast-2/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1545,
+      "output_per_1m": 0.618,
+      "cached_input_per_1m": 0.038625
+    },
+    "bedrock_mantle/ap-southeast-2/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0721,
+      "output_per_1m": 0.309,
+      "cached_input_per_1m": 0.018025
+    },
+    "bedrock_mantle/ap-southeast-2/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1545,
+      "output_per_1m": 0.618,
+      "cached_input_per_1m": 0.038625
+    },
+    "bedrock_mantle/ap-southeast-2/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.0721,
+      "output_per_1m": 0.206,
+      "cached_input_per_1m": 0.018025
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2266,
+      "output_per_1m": 0.9064,
+      "cached_input_per_1m": 0.05665
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1545,
+      "output_per_1m": 0.618,
+      "cached_input_per_1m": 0.038625
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1545,
+      "output_per_1m": 0.618,
+      "cached_input_per_1m": 0.038625
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-coder-480b-a35b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.4635,
+      "output_per_1m": 1.854,
+      "cached_input_per_1m": 0.115875
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.52,
+      "output_per_1m": 1.24,
+      "cached_input_per_1m": 0.13
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.1442,
+      "output_per_1m": 1.236,
+      "cached_input_per_1m": 0.03605
+    },
+    "bedrock_mantle/ap-southeast-2/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.5459,
+      "output_per_1m": 2.7398,
+      "cached_input_per_1m": 0.136475
+    },
+    "bedrock_mantle/ap-southeast-2/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.0375
+    },
+    "bedrock_mantle/ap-southeast-2/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 2.27,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/ap-southeast-2/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.41,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/ap-southeast-2/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.03,
+      "output_per_1m": 3.3,
+      "cached_input_per_1m": 0.2575
+    },
+    "bedrock_mantle/ap-southeast-3/deepseek.v3.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.74,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/ap-southeast-3/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock_mantle/ap-southeast-3/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.108,
+      "output_per_1m": 0.348,
+      "cached_input_per_1m": 0.027
+    },
+    "bedrock_mantle/ap-southeast-3/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.276,
+      "output_per_1m": 0.456,
+      "cached_input_per_1m": 0.069
+    },
+    "bedrock_mantle/ap-southeast-3/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.096,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/ap-southeast-3/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-southeast-3/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-southeast-3/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.8,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.048,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/ap-southeast-3/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/ap-southeast-3/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.0,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-southeast-3/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-southeast-3/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/ap-southeast-3/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock_mantle/ap-southeast-3/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.276,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock_mantle/ap-southeast-3/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-southeast-3/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock_mantle/ap-southeast-3/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.31,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/ap-southeast-3/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-southeast-3/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.084,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.021
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.91,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-coder-480b-a35b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.47,
+      "output_per_1m": 1.87,
+      "cached_input_per_1m": 0.1175
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/ap-southeast-3/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.636,
+      "output_per_1m": 3.192,
+      "cached_input_per_1m": 0.159
+    },
+    "bedrock_mantle/ap-southeast-3/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/ap-southeast-3/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/ap-southeast-3/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/ap-southeast-3/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock_mantle/eu-central-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.108,
+      "output_per_1m": 0.348,
+      "cached_input_per_1m": 0.027
+    },
+    "bedrock_mantle/eu-central-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.276,
+      "output_per_1m": 0.456,
+      "cached_input_per_1m": 0.069
+    },
+    "bedrock_mantle/eu-central-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.096,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/eu-central-1/google.gemma-4-26b-a4b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.156,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.039
+    },
+    "bedrock_mantle/eu-central-1/google.gemma-4-31b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/eu-central-1/google.gemma-4-e2b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.096,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/eu-central-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-central-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-central-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-central-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/eu-central-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.8,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/eu-central-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/eu-central-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-central-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-central-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.048,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/eu-central-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-central-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/eu-central-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock_mantle/eu-central-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.276,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock_mantle/eu-central-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-central-1/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/eu-central-1/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock_mantle/eu-central-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-central-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.084,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.021
+    },
+    "bedrock_mantle/eu-central-1/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.29,
+      "output_per_1m": 1.16,
+      "cached_input_per_1m": 0.0725
+    },
+    "bedrock_mantle/eu-central-1/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/eu-central-1/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/eu-central-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/eu-central-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/eu-central-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.636,
+      "output_per_1m": 3.192,
+      "cached_input_per_1m": 0.159
+    },
+    "bedrock_mantle/eu-central-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-central-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-north-1/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock_mantle/eu-north-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.108,
+      "output_per_1m": 0.348,
+      "cached_input_per_1m": 0.027
+    },
+    "bedrock_mantle/eu-north-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.276,
+      "output_per_1m": 0.456,
+      "cached_input_per_1m": 0.069
+    },
+    "bedrock_mantle/eu-north-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.096,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/eu-north-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-north-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-north-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-north-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/eu-north-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.8,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/eu-north-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/eu-north-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-north-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-north-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.048,
+      "output_per_1m": 0.048,
+      "cached_input_per_1m": 0.012
+    },
+    "bedrock_mantle/eu-north-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-north-1/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.0,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/eu-north-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/eu-north-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/eu-north-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.288,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock_mantle/eu-north-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.072,
+      "output_per_1m": 0.276,
+      "cached_input_per_1m": 0.018
+    },
+    "bedrock_mantle/eu-north-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-north-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-north-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.084,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.021
+    },
+    "bedrock_mantle/eu-north-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/eu-north-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/eu-north-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.636,
+      "output_per_1m": 3.192,
+      "cached_input_per_1m": 0.159
+    },
+    "bedrock_mantle/eu-north-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-north-1/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/eu-north-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-north-1/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock_mantle/eu-south-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/eu-south-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.27,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock_mantle/eu-south-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.09,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/eu-south-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.35,
+      "output_per_1m": 1.41,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock_mantle/eu-south-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-south-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-south-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/eu-south-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock_mantle/eu-south-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-south-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-south-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-south-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/eu-south-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-south-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-south-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/eu-south-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.27,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/eu-south-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-south-1/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/eu-south-1/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.4,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock_mantle/eu-south-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-south-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-south-1/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.29,
+      "output_per_1m": 1.16,
+      "cached_input_per_1m": 0.0725
+    },
+    "bedrock_mantle/eu-south-1/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/eu-south-1/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.2,
+      "output_per_1m": 0.79,
+      "cached_input_per_1m": 0.05
+    },
+    "bedrock_mantle/eu-south-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/eu-south-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/eu-south-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.12,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/eu-south-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-south-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-west-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.34,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/eu-west-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.27,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.0675
+    },
+    "bedrock_mantle/eu-west-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.09,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/eu-west-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.35,
+      "output_per_1m": 1.41,
+      "cached_input_per_1m": 0.0875
+    },
+    "bedrock_mantle/eu-west-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-west-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-west-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/eu-west-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.59,
+      "output_per_1m": 1.76,
+      "cached_input_per_1m": 0.1475
+    },
+    "bedrock_mantle/eu-west-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-west-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/eu-west-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/eu-west-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/eu-west-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.27,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/eu-west-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-west-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-west-1/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.264,
+      "output_per_1m": 1.056,
+      "cached_input_per_1m": 0.066
+    },
+    "bedrock_mantle/eu-west-1/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.7,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/eu-west-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/eu-west-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.12,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/eu-west-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/eu-west-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/eu-west-2/deepseek.v3.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.899985,
+      "output_per_1m": 2.606853,
+      "cached_input_per_1m": 0.224996
+    },
+    "bedrock_mantle/eu-west-2/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.961,
+      "output_per_1m": 2.8675,
+      "cached_input_per_1m": 0.24025
+    },
+    "bedrock_mantle/eu-west-2/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.14,
+      "output_per_1m": 0.45,
+      "cached_input_per_1m": 0.035
+    },
+    "bedrock_mantle/eu-west-2/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 0.59,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/eu-west-2/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock_mantle/eu-west-2/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.47,
+      "output_per_1m": 1.86,
+      "cached_input_per_1m": 0.1175
+    },
+    "bedrock_mantle/eu-west-2/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.47,
+      "output_per_1m": 1.86,
+      "cached_input_per_1m": 0.1175
+    },
+    "bedrock_mantle/eu-west-2/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.47,
+      "output_per_1m": 1.86,
+      "cached_input_per_1m": 0.1175
+    },
+    "bedrock_mantle/eu-west-2/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.62,
+      "output_per_1m": 3.1,
+      "cached_input_per_1m": 0.155
+    },
+    "bedrock_mantle/eu-west-2/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.78,
+      "output_per_1m": 2.33,
+      "cached_input_per_1m": 0.195
+    },
+    "bedrock_mantle/eu-west-2/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.31,
+      "output_per_1m": 0.31,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock_mantle/eu-west-2/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.16,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock_mantle/eu-west-2/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.23,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.06,
+      "output_per_1m": 0.06,
+      "cached_input_per_1m": 0.015
+    },
+    "bedrock_mantle/eu-west-2/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.16,
+      "output_per_1m": 0.47,
+      "cached_input_per_1m": 0.04
+    },
+    "bedrock_mantle/eu-west-2/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.93,
+      "output_per_1m": 3.875,
+      "cached_input_per_1m": 0.2325
+    },
+    "bedrock_mantle/eu-west-2/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.93,
+      "output_per_1m": 4.65,
+      "cached_input_per_1m": 0.2325
+    },
+    "bedrock_mantle/eu-west-2/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.31,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0775
+    },
+    "bedrock_mantle/eu-west-2/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.37,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock_mantle/eu-west-2/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.09,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.0225
+    },
+    "bedrock_mantle/eu-west-2/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 1.01,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.47,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/eu-west-2/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.31,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.34,
+      "output_per_1m": 1.37,
+      "cached_input_per_1m": 0.085
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-coder-480b-a35b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.7,
+      "output_per_1m": 2.79,
+      "cached_input_per_1m": 0.175
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.78,
+      "output_per_1m": 1.86,
+      "cached_input_per_1m": 0.195
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.217,
+      "output_per_1m": 1.86,
+      "cached_input_per_1m": 0.05425
+    },
+    "bedrock_mantle/eu-west-2/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.82,
+      "output_per_1m": 4.12,
+      "cached_input_per_1m": 0.205
+    },
+    "bedrock_mantle/eu-west-2/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.23,
+      "output_per_1m": 0.93,
+      "cached_input_per_1m": 0.0575
+    },
+    "bedrock_mantle/eu-west-2/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.93,
+      "output_per_1m": 3.41,
+      "cached_input_per_1m": 0.2325
+    },
+    "bedrock_mantle/eu-west-2/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.62,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/eu-west-2/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.55,
+      "output_per_1m": 4.96,
+      "cached_input_per_1m": 0.3875
+    },
+    "bedrock_mantle/sa-east-1/deepseek.v3.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.696,
+      "output_per_1m": 2.016,
+      "cached_input_per_1m": 0.174
+    },
+    "bedrock_mantle/sa-east-1/deepseek.v3.2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.74,
+      "output_per_1m": 2.22,
+      "cached_input_per_1m": 0.185
+    },
+    "bedrock_mantle/sa-east-1/google.gemma-3-12b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.11,
+      "output_per_1m": 0.35,
+      "cached_input_per_1m": 0.0275
+    },
+    "bedrock_mantle/sa-east-1/google.gemma-3-27b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.28,
+      "output_per_1m": 0.46,
+      "cached_input_per_1m": 0.07
+    },
+    "bedrock_mantle/sa-east-1/google.gemma-3-4b-it": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.1,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/sa-east-1/minimax.minimax-m2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.45,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/sa-east-1/minimax.minimax-m2.1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/sa-east-1/minimax.minimax-m2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.36,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.09
+    },
+    "bedrock_mantle/sa-east-1/mistral.devstral-2-123b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.48,
+      "output_per_1m": 2.4,
+      "cached_input_per_1m": 0.12
+    },
+    "bedrock_mantle/sa-east-1/mistral.magistral-small-2509": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock_mantle/sa-east-1/mistral.ministral-3-14b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/sa-east-1/mistral.ministral-3-3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.12,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/sa-east-1/mistral.ministral-3-8b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.18,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/mistral.mistral-large-3-675b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.61,
+      "output_per_1m": 1.82,
+      "cached_input_per_1m": 0.1525
+    },
+    "bedrock_mantle/sa-east-1/mistral.voxtral-mini-3b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.05,
+      "cached_input_per_1m": 0.0125
+    },
+    "bedrock_mantle/sa-east-1/mistral.voxtral-small-24b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.12,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.03
+    },
+    "bedrock_mantle/sa-east-1/moonshotai.kimi-k2-thinking": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.73,
+      "output_per_1m": 3.03,
+      "cached_input_per_1m": 0.1825
+    },
+    "bedrock_mantle/sa-east-1/moonshotai.kimi-k2.5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 3.6,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/sa-east-1/nvidia.nemotron-nano-12b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.24,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.06
+    },
+    "bedrock_mantle/sa-east-1/nvidia.nemotron-nano-3-30b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.29,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/sa-east-1/nvidia.nemotron-nano-9b-v2": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.07,
+      "output_per_1m": 0.28,
+      "cached_input_per_1m": 0.0175
+    },
+    "bedrock_mantle/sa-east-1/nvidia.nemotron-super-3-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.78,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/openai.gpt-oss-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/openai.gpt-oss-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.36,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/sa-east-1/openai.gpt-oss-safeguard-120b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/openai.gpt-oss-safeguard-20b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.24,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-235b-a22b-2507": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.264,
+      "output_per_1m": 1.056,
+      "cached_input_per_1m": 0.066
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-32b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-coder-30b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.73,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-coder-480b-a35b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.54,
+      "output_per_1m": 2.16,
+      "cached_input_per_1m": 0.135
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-coder-next": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.6,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.15
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-next-80b-a3b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.168,
+      "output_per_1m": 1.44,
+      "cached_input_per_1m": 0.042
+    },
+    "bedrock_mantle/sa-east-1/qwen.qwen3-vl-235b-a22b-instruct": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.64,
+      "output_per_1m": 3.22,
+      "cached_input_per_1m": 0.16
+    },
+    "bedrock_mantle/sa-east-1/writer.palmyra-vision-7b": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.18,
+      "output_per_1m": 0.72,
+      "cached_input_per_1m": 0.045
+    },
+    "bedrock_mantle/sa-east-1/zai.glm-4.7": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.72,
+      "output_per_1m": 2.64,
+      "cached_input_per_1m": 0.18
+    },
+    "bedrock_mantle/sa-east-1/zai.glm-4.7-flash": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 0.08,
+      "output_per_1m": 0.48,
+      "cached_input_per_1m": 0.02
+    },
+    "bedrock_mantle/sa-east-1/zai.glm-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 1.2,
+      "output_per_1m": 3.84,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock_mantle/us-gov-west-1/anthropic.claude-fable-5-1": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 12.0,
+      "output_per_1m": 60.0,
+      "cached_input_per_1m": 0.3
+    },
+    "bedrock_mantle/us-gov-west-1/anthropic.claude-opus-4-8": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 6.0,
+      "output_per_1m": 30.0,
+      "cached_input_per_1m": 0.6
+    },
+    "bedrock_mantle/us-gov-west-1/anthropic.claude-opus-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 6.0,
+      "output_per_1m": 30.0,
+      "cached_input_per_1m": 0.6
+    },
+    "bedrock_mantle/us-gov-west-1/anthropic.claude-sonnet-5": {
+      "provider": "bedrock_mantle",
+      "input_per_1m": 2.4,
+      "output_per_1m": 12.0,
+      "cached_input_per_1m": 0.24
+    },
+    "databricks/system.ai.gpt-6-2-astra": {
+      "provider": "databricks",
+      "input_per_1m": 8.00002,
+      "output_per_1m": 40.00003,
+      "cached_input_per_1m": 0.39998
+    },
+    "databricks/system.ai.gpt-6-2-sol": {
+      "provider": "databricks",
+      "input_per_1m": 1.99997,
+      "output_per_1m": 9.99999,
+      "cached_input_per_1m": 0.10003
+    },
+    "gemini/gemini-4-neon": {
+      "provider": "google",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.15
+    },
+    "vertex_ai/gemini-4-neon": {
+      "provider": "google",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.15
+    },
+    "github_copilot/gemini-4-neon": {
+      "provider": "github_copilot",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.15
+    },
+    "openrouter/openai/gpt-6.2-astra": {
+      "provider": "openrouter",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.4
+    },
+    "openrouter/openai/gpt-6.2-sol": {
+      "provider": "openrouter",
+      "input_per_1m": 2.0,
+      "output_per_1m": 10.0,
+      "cached_input_per_1m": 0.1
+    },
+    "openrouter/anthropic/claude-fable-5.2": {
+      "provider": "openrouter",
+      "input_per_1m": 8.0,
+      "output_per_1m": 40.0,
+      "cached_input_per_1m": 0.2
+    },
+    "openrouter/google/gemini-4-hydrogen": {
+      "provider": "openrouter",
+      "input_per_1m": 1.5,
+      "output_per_1m": 7.5,
+      "cached_input_per_1m": 0.075
+    },
+    "jina-embeddings-v5-text-small": {
+      "provider": "jina_ai",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0125
+    },
+    "jina-embeddings-v5-text-nano": {
+      "provider": "jina_ai",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "jina-embeddings-v5-omni-small": {
+      "provider": "jina_ai",
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0125
+    },
+    "jina-embeddings-v5-omni-nano": {
+      "provider": "jina_ai",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "perplexity/pplx-decider-v1.3": {
+      "provider": "perplexity",
+      "input_per_1m": 0.02,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.005
+    },
+    "perplexity/pplx-decider-flash-v1.3": {
+      "provider": "perplexity",
+      "input_per_1m": 0.01,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.0025
+    },
+    "gemini/genie-4": {
+      "provider": "google",
+      "input_per_1m": 1.5,
+      "output_per_1m": 9.0,
+      "cached_input_per_1m": 0.15
+    },
+    "together_ai/tencent/Hy4": {
+      "provider": "together_ai",
+      "input_per_1m": 0.834,
+      "output_per_1m": 2.501,
+      "cached_input_per_1m": 0.042
+    },
+    "baseten/decision-models/baseten-bison-latest": {
+      "provider": "baseten",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.025
+    },
+    "baseten/decision-models/baseten-groundhog-latest": {
+      "provider": "baseten",
+      "input_per_1m": 0.035,
+      "output_per_1m": 0.0,
+      "cached_input_per_1m": 0.00875
+    },
+    "fireworks_ai/accounts/fireworks/routers/kimi-k3p1-pro-us": {
+      "provider": "fireworks_ai",
+      "input_per_1m": 2.5,
+      "output_per_1m": 12.5,
+      "cached_input_per_1m": 0.25
     }
   },
   "tools": {
